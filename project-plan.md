@@ -6,9 +6,10 @@ A GitHub CLI extension for managing issue dependencies using GitHub's native blo
 
 **Goal**: Create a GitHub CLI extension similar to `gh-sub-issue` but for managing issue dependencies using the new GitHub issue dependencies API.
 
+**Template**: Based on [gh-sub-issue](https://github.com/yahsan2/gh-sub-issue) architecture and patterns
 **Estimated Timeline**: Short-term project
-**Language**: Bash
-**Architecture**: Single executable script following GitHub CLI extension patterns
+**Language**: Go (with Cobra CLI framework)
+**Architecture**: Go binary following gh-sub-issue patterns and GitHub CLI extension conventions
 
 ## Core Features
 
@@ -46,24 +47,37 @@ A GitHub CLI extension for managing issue dependencies using GitHub's native blo
 
 ```text
 gh-issue-dependency/
-├── gh-issue-dependency          # Main executable script
+├── main.go                      # Entry point (delegates to cmd.Execute())
+├── cmd/
+│   ├── root.go                  # Root command and global flags
+│   ├── list.go                  # List command implementation
+│   ├── add.go                   # Add command implementation
+│   └── remove.go                # Remove command implementation
+├── pkg/                         # Shared utilities and types
+├── go.mod                       # Go module definition
+├── go.sum                       # Go module checksums
 ├── README.md                    # Installation and usage docs
 ├── LICENSE                      # MIT license
 ├── project-plan.md             # This file
-└── tests/                      # Test scripts (optional)
-    └── test.sh
+└── tests/
+    ├── integration_test.sh      # Shell-based integration tests
+    └── *_test.go                # Go unit tests
 ```
 
 ## Development Phases
 
-### Phase 1: Core Infrastructure
+### Phase 1: CLI Foundation (Core Infrastructure)
 
 - [x] Repository setup and cloning
-- [ ] Create main `gh-issue-dependency` script with:
-  - Help/usage function
-  - Argument parsing framework
-  - Basic error handling
-  - Repository detection using `gh repo view`
+- [ ] Create Go CLI foundation with:
+  - Go module initialization (go.mod)
+  - Cobra CLI framework setup
+  - Root command with help/usage
+  - Argument parsing and validation framework
+  - Layered error handling (following gh-sub-issue patterns)
+  - Repository context detection using `gh repo view --json`
+  - Testing infrastructure (unit tests + integration script)
+  - Standard gh CLI conventions (flags, help format, exit codes)
 
 ### Phase 2: List Command
 
@@ -130,10 +144,11 @@ gh-issue-dependency/
   - Non-existent issues
   - Permission scenarios
 
-### Automated Testing (Optional)
+### Automated Testing
 
-- Bash test script that creates/cleans up test issues
-- API mocking for unit tests
+- Go unit tests for all parsing and validation functions (following gh-sub-issue patterns)
+- Integration shell script that creates/cleans up test issues
+- Table-driven tests with comprehensive error scenarios
 - CI/CD integration with GitHub Actions
 
 ## Installation & Distribution
@@ -146,6 +161,7 @@ gh extension install torynet/gh-issue-dependency
 
 ### Requirements
 
+- Go 1.19+ (for building from source)
 - GitHub CLI (`gh`) installed and authenticated
 - Repository with Issues enabled
 - "Issues" repository permissions (read for list, write for add/remove)
@@ -180,6 +196,29 @@ gh extension install torynet/gh-issue-dependency
 - Bulk import/export of dependency relationships
 - Integration with issue templates for automatic dependency setup
 
+## Implementation Strategy
+
+### gh-sub-issue Template Usage
+
+**Architectural Patterns to Duplicate:**
+- Cobra CLI framework with clean command structure
+- Layered error handling with user-friendly messages
+- Repository context detection and flexible issue parsing
+- Standard gh CLI conventions (flags, help, output formats)
+- Comprehensive testing strategy (unit tests + integration)
+- GraphQL API integration patterns
+
+**Key Dependencies (mirror gh-sub-issue):**
+- `github.com/spf13/cobra` - CLI framework
+- `github.com/cli/go-gh/v2` - GitHub API integration
+- `github.com/stretchr/testify` - Testing framework
+
+**Development Approach:**
+1. Start with exact gh-sub-issue foundation structure
+2. Adapt their command patterns for dependency operations
+3. Reuse their error handling and validation approaches
+4. Follow their testing patterns and integration script structure
+
 ---
 
-*This plan adapts the proven architecture of gh-sub-issue while leveraging GitHub's native issue dependencies API for maximum compatibility and future-proofing.*
+*This plan leverages the proven, reliable architecture of gh-sub-issue while adapting it for GitHub's native issue dependencies API.*
