@@ -711,4 +711,581 @@ func CleanExpiredCache() error {
 	}
 	
 	return nil
+<<<<<<< HEAD
+=======
+}
+
+// GitHub API Integration for Dependency Removal
+//
+// These functions implement the GitHub API integration for deleting issue dependency
+// relationships using DELETE operations. They handle retry logic, error handling,
+// and integration with the validation system.
+
+// DependencyRemover provides GitHub API integration for removing dependency relationships.
+// It handles DELETE operations, error processing, retry logic, and success confirmation.
+type DependencyRemover struct {
+	client    *api.RESTClient
+	validator *RemovalValidator
+}
+
+// NewDependencyRemover creates a new dependency remover with GitHub API client
+func NewDependencyRemover() (*DependencyRemover, error) {
+	// Verify GitHub CLI authentication
+	if err := SetupGitHubClient(); err != nil {
+		return nil, err
+	}
+
+	// Create GitHub API client
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return nil, WrapInternalError("creating GitHub API client for removal", err)
+	}
+
+	// Create validator for removal operations
+	validator, err := NewRemovalValidator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create validator: %w", err)
+	}
+
+	return &DependencyRemover{
+		client:    client,
+		validator: validator,
+	}, nil
+}
+
+// RemoveRelationship removes a single dependency relationship between two issues
+func (r *DependencyRemover) RemoveRelationship(source, target IssueRef, relType string, opts RemoveOptions) error {
+	// 1. Run comprehensive validation pipeline
+	if err := r.validator.ValidateRemoval(source, target, relType); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
+	// 2. Handle dry run mode
+	if opts.DryRun {
+		return r.showDryRunPreview(source, target, relType)
+	}
+
+	// 3. Get user confirmation (unless --force is specified)
+	if !opts.Force {
+		confirmed, err := r.requestConfirmation(source, target, relType)
+		if err != nil {
+			return fmt.Errorf("confirmation failed: %w", err)
+		}
+		if !confirmed {
+			return NewAppError(
+				ErrorTypeValidation,
+				"Dependency removal cancelled by user",
+				nil,
+			).WithSuggestion("Use --force to skip confirmation prompts")
+		}
+	}
+
+	// 4. Execute deletion with retry logic
+	if err := r.deleteRelationshipWithRetry(source, target, relType); err != nil {
+		return fmt.Errorf("deletion failed: %w", err)
+	}
+
+	// 5. Show success confirmation
+	return r.showSuccessMessage(source, target, relType)
+}
+
+// RemoveBatchRelationships removes multiple dependency relationships in batch
+func (r *DependencyRemover) RemoveBatchRelationships(source IssueRef, targets []IssueRef, relType string, opts RemoveOptions) error {
+	// 1. Run batch validation
+	if err := r.validator.ValidateBatchRemoval(source, targets, relType); err != nil {
+		return fmt.Errorf("batch validation failed: %w", err)
+	}
+
+	// 2. Handle dry run mode
+	if opts.DryRun {
+		return r.showBatchDryRunPreview(source, targets, relType)
+	}
+
+	// 3. Get user confirmation for batch operation
+	if !opts.Force {
+		confirmed, err := r.requestBatchConfirmation(source, targets, relType)
+		if err != nil {
+			return fmt.Errorf("batch confirmation failed: %w", err)
+		}
+		if !confirmed {
+			return NewAppError(
+				ErrorTypeValidation,
+				"Batch dependency removal cancelled by user",
+				nil,
+			).WithSuggestion("Use --force to skip confirmation prompts")
+		}
+	}
+
+	// 4. Execute batch deletion
+	return r.executeBatchDeletion(source, targets, relType)
+}
+
+// deleteRelationshipWithRetry performs the actual DELETE operation with retry logic
+func (r *DependencyRemover) deleteRelationshipWithRetry(source, target IssueRef, relType string) error {
+	maxRetries := 3
+	baseDelay := 1 * time.Second
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		err := r.deleteRelationship(source, target, relType)
+		if err == nil {
+			return nil // Success
+		}
+
+		// Check if error is retryable
+		if !r.isRetryableError(err) {
+			return err // Don't retry for non-retryable errors
+		}
+
+		// Don't retry on last attempt
+		if attempt == maxRetries {
+			return fmt.Errorf("deletion failed after %d attempts: %w", maxRetries, err)
+		}
+
+		// Exponential backoff delay
+		delay := time.Duration(attempt) * baseDelay
+		time.Sleep(delay)
+	}
+
+	return nil
+}
+
+// deleteRelationship performs the actual DELETE API call
+func (r *DependencyRemover) deleteRelationship(source, target IssueRef, relType string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// First, get the relationship ID by finding the specific relationship
+	relationshipID, err := r.findRelationshipID(ctx, source, target, relType)
+	if err != nil {
+		return fmt.Errorf("failed to find relationship ID: %w", err)
+	}
+
+	// Construct the DELETE endpoint
+	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s", 
+		source.Owner, source.Repo, source.Number, relationshipID)
+
+	// Execute DELETE request
+	err = r.client.Delete(endpoint, nil)
+	if err != nil {
+		return r.handleDeleteError(err, source, target, relType)
+	}
+
+	return nil
+}
+
+// findRelationshipID finds the specific relationship ID for deletion
+func (r *DependencyRemover) findRelationshipID(ctx context.Context, source, target IssueRef, relType string) (string, error) {
+	// Get current dependencies to find the relationship ID
+	dependencies, err := r.validator.fetchIssueDependencies(ctx, source)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch dependencies: %w", err)
+	}
+
+	// Find the specific relationship
+	var relations []DependencyRelation
+	switch relType {
+	case "blocked-by":
+		relations = dependencies.BlockedBy
+	case "blocks":
+		relations = dependencies.Blocking
+	default:
+		return "", NewAppError(
+			ErrorTypeValidation,
+			fmt.Sprintf("Invalid relationship type: %s", relType),
+			nil,
+		).WithSuggestion("Use either 'blocked-by' or 'blocks'")
+	}
+
+	// Find matching relationship
+	for _, relation := range relations {
+		if r.matchesTarget(relation, target) {
+			// For GitHub's API, we typically use a combination of repo and issue number
+			// The relationship ID format depends on GitHub's implementation
+			return fmt.Sprintf("%s#%d", target.FullName, target.Number), nil
+		}
+	}
+
+	return "", NewAppError(
+		ErrorTypeIssue,
+		fmt.Sprintf("Relationship not found: %s %s %s", source.String(), relType, target.String()),
+		nil,
+	).WithSuggestion("Use 'gh issue-dependency list' to see current dependencies")
+}
+
+// matchesTarget checks if a dependency relation matches the target issue
+func (r *DependencyRemover) matchesTarget(relation DependencyRelation, target IssueRef) bool {
+	if relation.Issue.Number != target.Number {
+		return false
+	}
+
+	targetRepo := target.FullName
+	if targetRepo == "" {
+		targetRepo = fmt.Sprintf("%s/%s", target.Owner, target.Repo)
+	}
+
+	return relation.Repository == targetRepo || relation.Issue.Repository.FullName == targetRepo
+}
+
+// handleDeleteError processes and categorizes deletion errors
+func (r *DependencyRemover) handleDeleteError(err error, source, target IssueRef, relType string) error {
+	errMsg := strings.ToLower(err.Error())
+
+	// Authentication errors
+	if strings.Contains(errMsg, "unauthorized") || strings.Contains(errMsg, "401") {
+		return WrapAuthError(err).WithSuggestion("Run 'gh auth login' to authenticate")
+	}
+
+	// Permission errors
+	if strings.Contains(errMsg, "forbidden") || strings.Contains(errMsg, "403") {
+		repoName := fmt.Sprintf("%s/%s", source.Owner, source.Repo)
+		return NewPermissionDeniedError("remove dependencies", repoName).WithSuggestion(
+			"You need write or maintain permissions to modify dependencies")
+	}
+
+	// Not found errors - relationship may have been removed already
+	if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "404") {
+		return NewAppError(
+			ErrorTypeIssue,
+			fmt.Sprintf("Dependency relationship no longer exists: %s %s %s", 
+				source.String(), relType, target.String()),
+			err,
+		).WithSuggestion("The relationship may have been removed by another process")
+	}
+
+	// Rate limiting
+	if strings.Contains(errMsg, "rate limit") || strings.Contains(errMsg, "429") {
+		return WrapAPIError(429, err)
+	}
+
+	// Network errors
+	if strings.Contains(errMsg, "timeout") || strings.Contains(errMsg, "connection") {
+		return WrapNetworkError(err)
+	}
+
+	// Server errors
+	if strings.Contains(errMsg, "500") || strings.Contains(errMsg, "502") || strings.Contains(errMsg, "503") {
+		return WrapAPIError(500, err)
+	}
+
+	// Default internal error
+	return WrapInternalError("removing dependency relationship", err)
+}
+
+// isRetryableError determines if an error should trigger a retry
+func (r *DependencyRemover) isRetryableError(err error) bool {
+	// Check for retryable error types
+	if IsErrorType(err, ErrorTypeNetwork) {
+		return true
+	}
+	if IsErrorType(err, ErrorTypeAPI) {
+		// Rate limits and server errors are retryable
+		errMsg := strings.ToLower(err.Error())
+		return strings.Contains(errMsg, "rate limit") ||
+		       strings.Contains(errMsg, "500") ||
+		       strings.Contains(errMsg, "502") ||
+		       strings.Contains(errMsg, "503")
+	}
+
+	return false
+}
+
+// executeBatchDeletion performs batch deletion of multiple relationships
+func (r *DependencyRemover) executeBatchDeletion(source IssueRef, targets []IssueRef, relType string) error {
+	var errors []string
+	successCount := 0
+
+	for _, target := range targets {
+		err := r.deleteRelationshipWithRetry(source, target, relType)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", target.String(), err))
+		} else {
+			successCount++
+		}
+	}
+
+	// Report results
+	if len(errors) > 0 {
+		return NewAppError(
+			ErrorTypeAPI,
+			fmt.Sprintf("Batch removal partially failed: %d succeeded, %d failed", 
+				successCount, len(errors)),
+			nil,
+		).WithContext("errors", strings.Join(errors, "; ")).WithSuggestion(
+			"Review the errors and retry failed operations individually")
+	}
+
+	return r.showBatchSuccessMessage(source, targets, relType)
+}
+
+// User Interface and Confirmation Functions
+//
+// These functions handle user interaction, confirmation prompts, dry run previews,
+// and success/failure reporting for dependency removal operations.
+
+// showDryRunPreview displays what would be removed in dry run mode
+func (r *DependencyRemover) showDryRunPreview(source, target IssueRef, relType string) error {
+	fmt.Printf("Dry run: dependency removal preview\n\n")
+	
+	var relationshipDescription string
+	switch relType {
+	case "blocked-by":
+		relationshipDescription = fmt.Sprintf("blocked-by relationship: %s ← %s", source.String(), target.String())
+	case "blocks":
+		relationshipDescription = fmt.Sprintf("blocks relationship: %s → %s", source.String(), target.String())
+	}
+	
+	fmt.Printf("Would remove:\n")
+	fmt.Printf("  ❌ %s\n", relationshipDescription)
+	fmt.Printf("\nNo changes made. Use --force to skip confirmation or remove --dry-run to execute.\n")
+	
+	return nil
+}
+
+// showBatchDryRunPreview displays batch removal preview
+func (r *DependencyRemover) showBatchDryRunPreview(source IssueRef, targets []IssueRef, relType string) error {
+	fmt.Printf("Dry run: batch dependency removal preview\n\n")
+	fmt.Printf("Would remove %d relationships:\n", len(targets))
+	
+	for _, target := range targets {
+		var relationshipDescription string
+		switch relType {
+		case "blocked-by":
+			relationshipDescription = fmt.Sprintf("blocked-by relationship: %s ← %s", source.String(), target.String())
+		case "blocks":
+			relationshipDescription = fmt.Sprintf("blocks relationship: %s → %s", source.String(), target.String())
+		}
+		fmt.Printf("  ❌ %s\n", relationshipDescription)
+	}
+	
+	fmt.Printf("\nNo changes made. Use --force to skip confirmation or remove --dry-run to execute.\n")
+	
+	return nil
+}
+
+// requestConfirmation prompts user for confirmation before removing a relationship
+func (r *DependencyRemover) requestConfirmation(source, target IssueRef, relType string) (bool, error) {
+	// Get issue details for better confirmation prompt
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	
+	sourceIssue, err := fetchIssueDetails(ctx, r.client, source.Owner, source.Repo, source.Number)
+	if err != nil {
+		// Fall back to basic confirmation if we can't get details
+		return r.requestBasicConfirmation(source, target, relType)
+	}
+	
+	targetIssue, err := fetchIssueDetails(ctx, r.client, target.Owner, target.Repo, target.Number)
+	if err != nil {
+		// Fall back to basic confirmation if we can't get details
+		return r.requestBasicConfirmation(source, target, relType)
+	}
+	
+	fmt.Printf("Remove dependency relationship?\n")
+	fmt.Printf("  Source: %s - %s\n", source.String(), sourceIssue.Title)
+	fmt.Printf("  Target: %s - %s\n", target.String(), targetIssue.Title)
+	fmt.Printf("  Type: %s\n\n", relType)
+	
+	var relationshipDescription string
+	switch relType {
+	case "blocked-by":
+		relationshipDescription = fmt.Sprintf("This will remove the \"%s\" relationship between these issues.", relType)
+	case "blocks":
+		relationshipDescription = fmt.Sprintf("This will remove the \"%s\" relationship between these issues.", relType)
+	}
+	
+	fmt.Printf("%s\n", relationshipDescription)
+	fmt.Printf("Continue? (y/N): ")
+	
+	var response string
+	fmt.Scanln(&response)
+	
+	response = strings.ToLower(strings.TrimSpace(response))
+	return response == "y" || response == "yes", nil
+}
+
+// requestBasicConfirmation provides a basic confirmation prompt when issue details aren't available
+func (r *DependencyRemover) requestBasicConfirmation(source, target IssueRef, relType string) (bool, error) {
+	fmt.Printf("Remove %s dependency relationship between %s and %s?\n", relType, source.String(), target.String())
+	fmt.Printf("Continue? (y/N): ")
+	
+	var response string
+	fmt.Scanln(&response)
+	
+	response = strings.ToLower(strings.TrimSpace(response))
+	return response == "y" || response == "yes", nil
+}
+
+// requestBatchConfirmation prompts user for confirmation before batch removal
+func (r *DependencyRemover) requestBatchConfirmation(source IssueRef, targets []IssueRef, relType string) (bool, error) {
+	fmt.Printf("Remove %d dependency relationships?\n", len(targets))
+	fmt.Printf("  Source: %s\n", source.String())
+	fmt.Printf("  Type: %s\n", relType)
+	fmt.Printf("  Targets:\n")
+	
+	for _, target := range targets {
+		fmt.Printf("    - %s\n", target.String())
+	}
+	
+	fmt.Printf("\nThis will remove %d dependency relationships.\n", len(targets))
+	fmt.Printf("Continue? (y/N): ")
+	
+	var response string
+	fmt.Scanln(&response)
+	
+	response = strings.ToLower(strings.TrimSpace(response))
+	return response == "y" || response == "yes", nil
+}
+
+// showSuccessMessage displays success confirmation after removing a relationship
+func (r *DependencyRemover) showSuccessMessage(source, target IssueRef, relType string) error {
+	var relationshipSymbol string
+	switch relType {
+	case "blocked-by":
+		relationshipSymbol = "←"
+	case "blocks":
+		relationshipSymbol = "→"
+	}
+	
+	fmt.Printf("✅ Removed %s relationship: %s %s %s\n\n", 
+		relType, source.String(), relationshipSymbol, target.String())
+	fmt.Printf("Dependency removed successfully.\n")
+	
+	return nil
+}
+
+// showBatchSuccessMessage displays success confirmation after batch removal
+func (r *DependencyRemover) showBatchSuccessMessage(source IssueRef, targets []IssueRef, relType string) error {
+	var relationshipSymbol string
+	switch relType {
+	case "blocked-by":
+		relationshipSymbol = "←"
+	case "blocks":
+		relationshipSymbol = "→"
+	}
+	
+	fmt.Printf("✅ Removed %d %s relationships:\n", len(targets), relType)
+	for _, target := range targets {
+		fmt.Printf("  %s %s %s\n", source.String(), relationshipSymbol, target.String())
+	}
+	fmt.Printf("\nBatch dependency removal completed successfully.\n")
+	
+	return nil
+}
+
+// Advanced DELETE Operations with Cross-Repository Support
+//
+// These functions extend the basic DELETE operations to handle cross-repository
+// dependency deletion and provide enhanced error handling for complex scenarios.
+
+// RemoveCrossRepositoryRelationship handles dependency removal across different repositories
+func (r *DependencyRemover) RemoveCrossRepositoryRelationship(source, target IssueRef, relType string, opts RemoveOptions) error {
+	// Cross-repository relationships require additional validation
+	if err := r.validateCrossRepositoryPermissions(source, target); err != nil {
+		return fmt.Errorf("cross-repository validation failed: %w", err)
+	}
+	
+	// Use the standard removal process
+	return r.RemoveRelationship(source, target, relType, opts)
+}
+
+// validateCrossRepositoryPermissions ensures user has permissions in both repositories
+func (r *DependencyRemover) validateCrossRepositoryPermissions(source, target IssueRef) error {
+	// Validate source repository permissions
+	if err := ValidateRepoAccess(source.Owner, source.Repo); err != nil {
+		return fmt.Errorf("source repository access failed: %w", err)
+	}
+	
+	// Validate target repository permissions (for cross-repo dependencies)
+	if source.Owner != target.Owner || source.Repo != target.Repo {
+		if err := ValidateRepoAccess(target.Owner, target.Repo); err != nil {
+			return fmt.Errorf("target repository access failed: %w", err)
+		}
+	}
+	
+	return nil
+}
+
+// RemoveAllRelationships removes all dependency relationships for an issue
+func (r *DependencyRemover) RemoveAllRelationships(issue IssueRef, opts RemoveOptions) error {
+	// Get current dependencies
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	
+	dependencies, err := r.validator.fetchIssueDependencies(ctx, issue)
+	if err != nil {
+		return fmt.Errorf("failed to fetch dependencies for removal: %w", err)
+	}
+	
+	if len(dependencies.BlockedBy) == 0 && len(dependencies.Blocking) == 0 {
+		return NewAppError(
+			ErrorTypeIssue,
+			fmt.Sprintf("No dependency relationships found for %s", issue.String()),
+			nil,
+		).WithSuggestion("Use 'gh issue-dependency list' to see current dependencies")
+	}
+	
+	// Collect all targets
+	var blockedByTargets []IssueRef
+	var blockingTargets []IssueRef
+	
+	for _, relation := range dependencies.BlockedBy {
+		target := r.dependencyRelationToIssueRef(relation)
+		blockedByTargets = append(blockedByTargets, target)
+	}
+	
+	for _, relation := range dependencies.Blocking {
+		target := r.dependencyRelationToIssueRef(relation)
+		blockingTargets = append(blockingTargets, target)
+	}
+	
+	// Remove blocked-by relationships
+	if len(blockedByTargets) > 0 {
+		if err := r.RemoveBatchRelationships(issue, blockedByTargets, "blocked-by", opts); err != nil {
+			return fmt.Errorf("failed to remove blocked-by relationships: %w", err)
+		}
+	}
+	
+	// Remove blocking relationships
+	if len(blockingTargets) > 0 {
+		if err := r.RemoveBatchRelationships(issue, blockingTargets, "blocks", opts); err != nil {
+			return fmt.Errorf("failed to remove blocks relationships: %w", err)
+		}
+	}
+	
+	fmt.Printf("✅ Removed all dependency relationships for %s\n", issue.String())
+	fmt.Printf("  - %d blocked-by relationships removed\n", len(blockedByTargets))
+	fmt.Printf("  - %d blocks relationships removed\n\n", len(blockingTargets))
+	fmt.Printf("All dependencies cleared successfully.\n")
+	
+	return nil
+}
+
+// dependencyRelationToIssueRef converts a DependencyRelation to an IssueRef
+func (r *DependencyRemover) dependencyRelationToIssueRef(relation DependencyRelation) IssueRef {
+	// Parse the repository from the relation
+	repoParts := strings.Split(relation.Repository, "/")
+	if len(repoParts) != 2 {
+		// Fallback - extract from issue repository field
+		if relation.Issue.Repository.FullName != "" {
+			repoParts = strings.Split(relation.Issue.Repository.FullName, "/")
+		} else {
+			// Last resort - use empty values, which will cause validation errors
+			repoParts = []string{"", ""}
+		}
+	}
+	
+	owner := ""
+	repo := ""
+	if len(repoParts) == 2 {
+		owner = repoParts[0]
+		repo = repoParts[1]
+	}
+	
+	return IssueRef{
+		Owner:    owner,
+		Repo:     repo,
+		Number:   relation.Issue.Number,
+		FullName: relation.Repository,
+	}
+>>>>>>> epic/dependency-remove
 }

@@ -1,8 +1,9 @@
 ---
 name: dependency-remove
-status: backlog
+status: completed
 updated: 2025-09-06T22:20:27Z
-progress: 0%
+completed: 2025-09-07T19:47:28Z
+progress: 100%
 prd: .claude/prds/dependency-remove.md
 github: https://github.com/torynet/gh-issue-dependency/issues/21
 ---
