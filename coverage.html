@@ -1,0 +1,2663 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>cmd: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/torynet/gh-issue-dependency/cmd/add.go (12.0%)</option>
+				
+				<option value="file1">github.com/torynet/gh-issue-dependency/cmd/list.go (52.7%)</option>
+				
+				<option value="file2">github.com/torynet/gh-issue-dependency/cmd/remove.go (12.0%)</option>
+				
+				<option value="file3">github.com/torynet/gh-issue-dependency/cmd/root.go (36.4%)</option>
+				
+				<option value="file4">github.com/torynet/gh-issue-dependency/main.go (0.0%)</option>
+				
+				<option value="file5">github.com/torynet/gh-issue-dependency/pkg/errors.go (75.0%)</option>
+				
+				<option value="file6">github.com/torynet/gh-issue-dependency/pkg/github.go (39.0%)</option>
+				
+				<option value="file7">github.com/torynet/gh-issue-dependency/pkg/output.go (94.2%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package cmd
+
+import (
+        "fmt"
+        "strings"
+
+        "github.com/spf13/cobra"
+        "github.com/torynet/gh-issue-dependency/pkg"
+)
+
+// addCmd represents the add command
+var addCmd = &amp;cobra.Command{
+        Use:   "add &lt;issue-number&gt;",
+        Short: "Add dependency relationships between issues",
+        Long: `Add a dependency relationship between two issues using GitHub's native dependency API.
+
+RELATIONSHIP TYPES
+You must specify exactly one of the following relationship types:
+
+  --blocked-by   The specified issue is blocked by other issues
+                 (those issues must be completed first)
+                 
+  --blocks       The specified issue blocks other issues  
+                 (this issue must be completed before those issues)
+
+ISSUE REFERENCES
+Issues can be referenced in multiple ways:
+  • Simple number: 123 (same repository)
+  • Full reference: owner/repo#123 (cross-repository)
+  • Multiple issues: 123,456,789 (comma-separated, no spaces)
+
+VALIDATION
+The command validates that:
+  • All referenced issues exist and are accessible
+  • You have permission to modify the specified issues
+  • The dependency relationship doesn't create cycles
+
+FLAGS
+  --blocked-by string   Issue number(s) that block this issue (comma-separated)
+  --blocks string       Issue number(s) that this issue blocks (comma-separated)`,
+        Example: `  # Make issue #123 depend on issue #456
+  gh issue-dependency add 123 --blocked-by 456
+
+  # Make issue #123 block issue #789
+  gh issue-dependency add 123 --blocks 789
+
+  # Add cross-repository dependency
+  gh issue-dependency add 123 --blocked-by owner/other-repo#456
+
+  # Add multiple dependencies at once
+  gh issue-dependency add 123 --blocked-by 456,789,101
+
+  # Work with issues in a different repository
+  gh issue-dependency add 123 --blocks 456 --repo owner/other-repo`,
+        Args: cobra.ExactArgs(1),
+        RunE: func(cmd *cobra.Command, args []string) error <span class="cov0" title="0">{
+                issueNumber := args[0]
+
+                // Parse and validate the main issue number
+                _, issueNum, err := pkg.ParseIssueReference(issueNumber)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                // Validate that exactly one of --blocked-by or --blocks is specified
+                <span class="cov0" title="0">if addBlockedBy == "" &amp;&amp; addBlocks == "" </span><span class="cov0" title="0">{
+                        return pkg.NewAppError(
+                                pkg.ErrorTypeValidation,
+                                "Must specify either --blocked-by or --blocks",
+                                nil,
+                        ).WithSuggestion("Use --blocked-by to specify issues that block this one").
+                                WithSuggestion("Use --blocks to specify issues that this one blocks")
+                }</span>
+                
+                <span class="cov0" title="0">if addBlockedBy != "" &amp;&amp; addBlocks != "" </span><span class="cov0" title="0">{
+                        return pkg.NewAppError(
+                                pkg.ErrorTypeValidation,
+                                "Cannot specify both --blocked-by and --blocks at the same time",
+                                nil,
+                        ).WithSuggestion("Choose either --blocked-by or --blocks, not both")
+                }</span>
+
+                // Parse dependency issue references
+                <span class="cov0" title="0">var dependencyRefs []string
+                if addBlockedBy != "" </span><span class="cov0" title="0">{
+                        dependencyRefs = strings.Split(addBlockedBy, ",")
+                }</span> else<span class="cov0" title="0"> {
+                        dependencyRefs = strings.Split(addBlocks, ",")
+                }</span>
+
+                // Validate all dependency references
+                <span class="cov0" title="0">for _, ref := range dependencyRefs </span><span class="cov0" title="0">{
+                        ref = strings.TrimSpace(ref)
+                        if ref == "" </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+                        <span class="cov0" title="0">_, _, err := pkg.ParseIssueReference(ref)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                }
+
+                // TODO: Implement add functionality
+                <span class="cov0" title="0">if addBlockedBy != "" </span><span class="cov0" title="0">{
+                        return pkg.WrapInternalError(
+                                "adding blocked-by dependencies", 
+                                fmt.Errorf("add command not implemented yet: issue %d blocked by %s", issueNum, addBlockedBy),
+                        ).WithSuggestion("This feature is currently under development")
+                }</span> else<span class="cov0" title="0"> {
+                        return pkg.WrapInternalError(
+                                "adding blocks dependencies",
+                                fmt.Errorf("add command not implemented yet: issue %d blocks %s", issueNum, addBlocks),
+                        ).WithSuggestion("This feature is currently under development")
+                }</span>
+        },
+}
+
+// Flags for add command
+var (
+        // addBlockedBy contains a comma-separated list of issue references that block
+        // the target issue. These issues must be completed before the target can be worked on.
+        addBlockedBy string
+        
+        // addBlocks contains a comma-separated list of issue references that are blocked
+        // by the target issue. The target must be completed before these can be worked on.
+        addBlocks string
+)
+
+// init registers the add command with the root command and sets up its flags.
+func init() <span class="cov8" title="1">{
+        rootCmd.AddCommand(addCmd)
+
+        // Local flags specific to the add command
+        // Note: These flags are mutually exclusive - validation happens in the command logic
+        addCmd.Flags().StringVar(&amp;addBlockedBy, "blocked-by", "", "Issue number(s) that block this issue (comma-separated)")
+        addCmd.Flags().StringVar(&amp;addBlocks, "blocks", "", "Issue number(s) that this issue blocks (comma-separated)")
+}</pre>
+		
+		<pre class="file" id="file1" style="display: none">package cmd
+
+import (
+        "context"
+        "fmt"
+        "strings"
+        "time"
+
+        "github.com/spf13/cobra"
+        "github.com/torynet/gh-issue-dependency/pkg"
+)
+
+// listCmd represents the list command
+var listCmd = &amp;cobra.Command{
+        Use:   "list &lt;issue-number&gt;",
+        Short: "List issue dependencies and relationships",
+        Long: `List all dependencies for the specified issue, showing both blocking and blocked-by relationships.
+
+DEPENDENCIES SHOWN
+  • Blocking issues: Issues that must be resolved before this issue can be completed
+  • Blocked issues: Issues that are waiting for this issue to be completed  
+  • Cross-repository dependencies when applicable
+
+OUTPUT FORMATS
+  • table (default): Human-readable table format with issue titles and states
+  • json: Machine-readable JSON for scripting and integration
+  • csv: Comma-separated values for spreadsheet import
+
+The output includes issue numbers, repository information, titles, current status,
+and relationship type (blocking vs blocked).
+
+FLAGS
+  --detailed       Show detailed dependency information including dates and users
+  --format string  Output format: table, json, csv (default "table")
+  --state string   Filter dependencies by issue state: all, open, closed (default "all")
+  --sort string    Sort dependencies by: number, title, state, repository (default "number")
+  --json string    Output JSON with specific fields (e.g., "blocked_by,blocks")`,
+        Example: `  # List all dependencies for issue #123
+  gh issue-dependency list 123
+
+  # List dependencies for issue in a different repository  
+  gh issue-dependency list 456 --repo owner/other-repo
+
+  # Show detailed dependency information
+  gh issue-dependency list 789 --detailed
+
+  # Output dependencies as JSON for scripting
+  gh issue-dependency list 123 --format json
+
+  # Output specific JSON fields
+  gh issue-dependency list 123 --json blocked_by,summary
+
+  # Export dependencies to CSV for analysis
+  gh issue-dependency list 456 --format csv &gt; dependencies.csv
+
+  # Show only open dependencies
+  gh issue-dependency list 123 --state open
+
+  # List closed dependencies in JSON format
+  gh issue-dependency list 456 --state closed --format json
+
+  # Sort dependencies by title
+  gh issue-dependency list 123 --sort title
+
+  # Sort cross-repository dependencies by repository name
+  gh issue-dependency list 456 --sort repository`,
+        Args: cobra.ExactArgs(1),
+        RunE: func(cmd *cobra.Command, args []string) error <span class="cov8" title="1">{
+                issueNumber := args[0]
+                
+                // Resolve repository context using GitHub repository detection.
+                // This handles both explicit --repo flags and automatic detection
+                // from the current working directory's git remote.
+                owner, repo, err := pkg.ResolveRepository(repoFlag, issueNumber)
+                if err != nil </span><span class="cov8" title="1">{
+                        return err
+                }</span>
+                
+                // Parse and validate the issue number from the user input.
+                // This supports both simple numbers (123) and full references (owner/repo#123).
+                <span class="cov0" title="0">_, issueNum, err := pkg.ParseIssueReference(issueNumber)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                // Validate the output format option against supported formats.
+                // We support table (default), JSON, and CSV formats for different use cases.
+                <span class="cov0" title="0">validFormats := []string{"table", "json", "csv"}
+                isValidFormat := false
+                for _, format := range validFormats </span><span class="cov0" title="0">{
+                        if listFormat == format </span><span class="cov0" title="0">{
+                                isValidFormat = true
+                                break</span>
+                        }
+                }
+                <span class="cov0" title="0">if !isValidFormat </span><span class="cov0" title="0">{
+                        return pkg.NewAppError(
+                                pkg.ErrorTypeValidation,
+                                fmt.Sprintf("Invalid format: %s", listFormat),
+                                nil,
+                        ).WithContext("format", listFormat).
+                                WithSuggestion("Use one of: table, json, csv")
+                }</span>
+
+                // Validate the state filter option against supported states.
+                // We support all (default), open, and closed states for filtering dependencies.
+                <span class="cov0" title="0">validStates := []string{"all", "open", "closed"}
+                isValidState := false
+                for _, state := range validStates </span><span class="cov0" title="0">{
+                        if listState == state </span><span class="cov0" title="0">{
+                                isValidState = true
+                                break</span>
+                        }
+                }
+                <span class="cov0" title="0">if !isValidState </span><span class="cov0" title="0">{
+                        return pkg.NewAppError(
+                                pkg.ErrorTypeValidation,
+                                fmt.Sprintf("Invalid state: %s", listState),
+                                nil,
+                        ).WithContext("state", listState).
+                                WithSuggestion("Use one of: all, open, closed")
+                }</span>
+
+                // Validate the sort option against supported sort orders.
+                // We support number (default), title, state, and repository for sorting dependencies.
+                <span class="cov0" title="0">validSorts := []string{"number", "title", "state", "repository"}
+                isValidSort := false
+                for _, sort := range validSorts </span><span class="cov0" title="0">{
+                        if listSort == sort </span><span class="cov0" title="0">{
+                                isValidSort = true
+                                break</span>
+                        }
+                }
+                <span class="cov0" title="0">if !isValidSort </span><span class="cov0" title="0">{
+                        return pkg.NewAppError(
+                                pkg.ErrorTypeValidation,
+                                fmt.Sprintf("Invalid sort: %s", listSort),
+                                nil,
+                        ).WithContext("sort", listSort).
+                                WithSuggestion("Use one of: number, title, state, repository")
+                }</span>
+
+                // Fetch dependency data from GitHub API and display results
+                // This replaces the placeholder output with real GitHub API integration
+                <span class="cov0" title="0">return fetchAndDisplayDependencies(owner, repo, issueNum, listFormat, listState, listSort, listDetailed)</span>
+        },
+}
+
+// Flags for list command
+var (
+        // listDetailed controls whether to show detailed dependency information
+        // including creation dates, users who created relationships, etc.
+        listDetailed bool
+        
+        // listFormat specifies the output format for dependency information.
+        // Supported formats: table (default), json, csv
+        listFormat string
+        
+        // listState filters dependencies by issue state.
+        // Supported states: all (default), open, closed
+        listState string
+        
+        // listSort specifies the sort order for dependencies.
+        // Supported orders: number (default), title, state, repository
+        listSort string
+        
+        // listJSON specifies JSON fields for selective output
+        // When set, overrides listFormat to use JSON with specific fields
+        listJSON string
+)
+
+// fetchAndDisplayDependencies fetches real dependency data from GitHub API and displays it
+// This function replaces the placeholder output with actual GitHub API integration
+func fetchAndDisplayDependencies(owner, repo string, issueNum int, format, state, sortOrder string, detailed bool) error <span class="cov0" title="0">{
+        // Create context with timeout for API calls
+        ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+        defer cancel()
+        
+        // Clean expired cache entries periodically (fail silently if error)
+        go pkg.CleanExpiredCache()
+        
+        // Fetch dependency data from GitHub API
+        originalData, err := pkg.FetchIssueDependencies(ctx, owner, repo, issueNum)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        
+        // Apply state filtering, keeping reference to original data
+        <span class="cov0" title="0">filteredData := applyStateFilter(originalData, state)
+        
+        // Apply sorting to the filtered data
+        filteredData = applySorting(filteredData, sortOrder)
+        
+        // Determine output format and create formatter
+        outputOptions := pkg.DefaultOutputOptions()
+        outputOptions.Detailed = detailed
+        outputOptions.StateFilter = state
+        outputOptions.OriginalData = originalData
+        
+        // Handle JSON field selection
+        if listJSON != "" </span><span class="cov0" title="0">{
+                outputOptions.Format = pkg.FormatJSON
+                if listJSON != "true" </span><span class="cov0" title="0">{ // If not just --json, parse fields
+                        fields := parseJSONFields(listJSON)
+                        outputOptions.JSONFields = fields
+                }</span>
+        } else<span class="cov0" title="0"> {
+                // Use regular format flag
+                switch format </span>{
+                case "json":<span class="cov0" title="0">
+                        outputOptions.Format = pkg.FormatJSON</span>
+                case "csv":<span class="cov0" title="0">
+                        outputOptions.Format = pkg.FormatCSV</span>
+                case "table":<span class="cov0" title="0">
+                        outputOptions.Format = pkg.FormatAuto</span> // Auto-detect TTY vs plain
+                default:<span class="cov0" title="0">
+                        outputOptions.Format = pkg.FormatAuto</span>
+                }
+        }
+        
+        // Create formatter and display results
+        <span class="cov0" title="0">formatter := pkg.NewOutputFormatter(outputOptions)
+        return formatter.FormatOutput(filteredData)</span>
+}
+
+// parseJSONFields parses the JSON fields specification
+func parseJSONFields(fieldsStr string) []string <span class="cov8" title="1">{
+        if fieldsStr == "" </span><span class="cov8" title="1">{
+                return []string{}
+        }</span>
+        
+        // Split by comma and trim whitespace
+        <span class="cov8" title="1">var fields []string
+        for _, field := range strings.Split(fieldsStr, ",") </span><span class="cov8" title="1">{
+                field = strings.TrimSpace(field)
+                if field != "" </span><span class="cov8" title="1">{
+                        fields = append(fields, field)
+                }</span>
+        }
+        <span class="cov8" title="1">return fields</span>
+}
+
+// applyStateFilter filters dependencies based on issue state
+func applyStateFilter(data *pkg.DependencyData, state string) *pkg.DependencyData <span class="cov8" title="1">{
+        if state == "all" </span><span class="cov8" title="1">{
+                return data
+        }</span>
+        
+        // Create a copy to avoid modifying the original
+        <span class="cov8" title="1">filtered := &amp;pkg.DependencyData{
+                SourceIssue: data.SourceIssue,
+                BlockedBy:   []pkg.DependencyRelation{},
+                Blocking:    []pkg.DependencyRelation{},
+                FetchedAt:   data.FetchedAt,
+        }
+        
+        // Filter blocked_by relationships
+        for _, dep := range data.BlockedBy </span><span class="cov8" title="1">{
+                if state == "all" || dep.Issue.State == state </span><span class="cov8" title="1">{
+                        filtered.BlockedBy = append(filtered.BlockedBy, dep)
+                }</span>
+        }
+        
+        // Filter blocking relationships
+        <span class="cov8" title="1">for _, dep := range data.Blocking </span><span class="cov8" title="1">{
+                if state == "all" || dep.Issue.State == state </span><span class="cov8" title="1">{
+                        filtered.Blocking = append(filtered.Blocking, dep)
+                }</span>
+        }
+        
+        // Update total count
+        <span class="cov8" title="1">filtered.TotalCount = len(filtered.BlockedBy) + len(filtered.Blocking)
+        
+        return filtered</span>
+}
+
+// applySorting sorts dependencies based on the specified sort order
+func applySorting(data *pkg.DependencyData, sortOrder string) *pkg.DependencyData <span class="cov8" title="1">{
+        if sortOrder == "" || sortOrder == "number" </span><span class="cov8" title="1">{
+                // Default is already sorted by number from API, no need to re-sort
+                return data
+        }</span>
+        
+        // Create a copy to avoid modifying the original
+        <span class="cov8" title="1">sorted := &amp;pkg.DependencyData{
+                SourceIssue:            data.SourceIssue,
+                BlockedBy:              make([]pkg.DependencyRelation, len(data.BlockedBy)),
+                Blocking:               make([]pkg.DependencyRelation, len(data.Blocking)),
+                FetchedAt:              data.FetchedAt,
+                TotalCount:             data.TotalCount,
+                OriginalBlockedByCount: data.OriginalBlockedByCount,
+                OriginalBlockingCount:  data.OriginalBlockingCount,
+        }
+        
+        // Copy dependencies for sorting
+        copy(sorted.BlockedBy, data.BlockedBy)
+        copy(sorted.Blocking, data.Blocking)
+        
+        // Sort blocked_by relationships
+        sortDependencySlice(sorted.BlockedBy, sortOrder)
+        
+        // Sort blocking relationships
+        sortDependencySlice(sorted.Blocking, sortOrder)
+        
+        return sorted</span>
+}
+
+// sortDependencySlice sorts a slice of dependencies based on the sort order
+func sortDependencySlice(deps []pkg.DependencyRelation, sortOrder string) <span class="cov8" title="1">{
+        switch sortOrder </span>{
+        case "title":<span class="cov8" title="1">
+                // Sort by issue title alphabetically
+                for i := 0; i &lt; len(deps)-1; i++ </span><span class="cov8" title="1">{
+                        for j := i + 1; j &lt; len(deps); j++ </span><span class="cov8" title="1">{
+                                if strings.ToLower(deps[i].Issue.Title) &gt; strings.ToLower(deps[j].Issue.Title) </span><span class="cov8" title="1">{
+                                        deps[i], deps[j] = deps[j], deps[i]
+                                }</span>
+                        }
+                }
+        case "state":<span class="cov8" title="1">
+                // Sort by state (open first, then closed)
+                for i := 0; i &lt; len(deps)-1; i++ </span><span class="cov8" title="1">{
+                        for j := i + 1; j &lt; len(deps); j++ </span><span class="cov8" title="1">{
+                                if stateOrder(deps[i].Issue.State) &gt; stateOrder(deps[j].Issue.State) </span><span class="cov8" title="1">{
+                                        deps[i], deps[j] = deps[j], deps[i]
+                                }</span>
+                        }
+                }
+        case "repository":<span class="cov8" title="1">
+                // Sort by repository name alphabetically
+                for i := 0; i &lt; len(deps)-1; i++ </span><span class="cov8" title="1">{
+                        for j := i + 1; j &lt; len(deps); j++ </span><span class="cov8" title="1">{
+                                if strings.ToLower(deps[i].Repository) &gt; strings.ToLower(deps[j].Repository) </span><span class="cov8" title="1">{
+                                        deps[i], deps[j] = deps[j], deps[i]
+                                }</span>
+                        }
+                }
+        case "number":<span class="cov8" title="1">
+                // Sort by issue number (ascending)
+                for i := 0; i &lt; len(deps)-1; i++ </span><span class="cov8" title="1">{
+                        for j := i + 1; j &lt; len(deps); j++ </span><span class="cov8" title="1">{
+                                if deps[i].Issue.Number &gt; deps[j].Issue.Number </span><span class="cov8" title="1">{
+                                        deps[i], deps[j] = deps[j], deps[i]
+                                }</span>
+                        }
+                }
+        }
+}
+
+// stateOrder returns a numeric value for state sorting (open = 0, closed = 1)
+func stateOrder(state string) int <span class="cov8" title="1">{
+        switch strings.ToLower(state) </span>{
+        case "open":<span class="cov8" title="1">
+                return 0</span>
+        case "closed":<span class="cov8" title="1">
+                return 1</span>
+        default:<span class="cov8" title="1">
+                return 2</span>
+        }
+}
+
+// init registers the list command with the root command and sets up its flags.
+func init() <span class="cov8" title="1">{
+        rootCmd.AddCommand(listCmd)
+
+        // Local flags specific to the list command
+        listCmd.Flags().BoolVar(&amp;listDetailed, "detailed", false, "Show detailed dependency information including dates and users")
+        listCmd.Flags().StringVar(&amp;listFormat, "format", "table", "Output format: table (default), json, csv")
+        listCmd.Flags().StringVar(&amp;listState, "state", "all", "Filter dependencies by issue state: all (default), open, closed")
+        listCmd.Flags().StringVar(&amp;listSort, "sort", "number", "Sort dependencies by: number (default), title, state, repository")
+        listCmd.Flags().StringVar(&amp;listJSON, "json", "", "Output JSON with specific fields: e.g. 'blocked_by,blocks' or 'summary'")
+}</pre>
+		
+		<pre class="file" id="file2" style="display: none">package cmd
+
+import (
+        "fmt"
+        "strings"
+
+        "github.com/spf13/cobra"
+        "github.com/torynet/gh-issue-dependency/pkg"
+)
+
+// removeCmd represents the remove command
+var removeCmd = &amp;cobra.Command{
+        Use:   "remove &lt;issue-number&gt;",
+        Short: "Remove dependency relationships between issues",
+        Long: `Remove existing dependency relationships between issues using GitHub's native dependency API.
+
+RELATIONSHIP TYPES TO REMOVE
+You must specify exactly one of the following relationship types:
+
+  --blocked-by   Remove issues that are blocking the specified issue
+                 (removes the "blocked by" relationship)
+                 
+  --blocks       Remove issues that are blocked by the specified issue
+                 (removes the "blocks" relationship)
+
+ISSUE REFERENCES
+Issues can be referenced in multiple ways:
+  • Simple number: 123 (same repository)
+  • Full reference: owner/repo#123 (cross-repository)  
+  • Multiple issues: 123,456,789 (comma-separated, no spaces)
+
+SAFETY CONSIDERATIONS
+The command will:
+  • Validate that the specified relationships exist before attempting removal
+  • Show which relationships will be removed before making changes
+  • Fail gracefully if any referenced issues don't exist or aren't accessible
+  • Not require confirmation by default (relationships can be easily re-added)
+
+Note: Removing a dependency relationship does not affect the issues themselves,
+only the dependency links between them.
+
+FLAGS
+  --blocked-by string   Issue number(s) to remove from blocking this issue (comma-separated)
+  --blocks string       Issue number(s) to remove from being blocked by this issue (comma-separated)`,
+        Example: `  # Remove issue #456 from blocking issue #123
+  gh issue-dependency remove 123 --blocked-by 456
+
+  # Remove issue #789 from being blocked by issue #123  
+  gh issue-dependency remove 123 --blocks 789
+
+  # Remove cross-repository dependency
+  gh issue-dependency remove 123 --blocked-by owner/other-repo#456
+
+  # Remove multiple dependencies at once
+  gh issue-dependency remove 123 --blocked-by 456,789,101
+
+  # Work with issues in a different repository
+  gh issue-dependency remove 123 --blocks 456 --repo owner/other-repo`,
+        Args: cobra.ExactArgs(1),
+        RunE: func(cmd *cobra.Command, args []string) error <span class="cov0" title="0">{
+                issueNumber := args[0]
+
+                // Parse and validate the main issue number
+                _, issueNum, err := pkg.ParseIssueReference(issueNumber)
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                // Validate that exactly one of --blocked-by or --blocks is specified
+                <span class="cov0" title="0">if removeBlockedBy == "" &amp;&amp; removeBlocks == "" </span><span class="cov0" title="0">{
+                        return pkg.NewAppError(
+                                pkg.ErrorTypeValidation,
+                                "Must specify either --blocked-by or --blocks",
+                                nil,
+                        ).WithSuggestion("Use --blocked-by to remove issues that block this one").
+                                WithSuggestion("Use --blocks to remove issues that this one blocks")
+                }</span>
+                
+                <span class="cov0" title="0">if removeBlockedBy != "" &amp;&amp; removeBlocks != "" </span><span class="cov0" title="0">{
+                        return pkg.NewAppError(
+                                pkg.ErrorTypeValidation,
+                                "Cannot specify both --blocked-by and --blocks at the same time",
+                                nil,
+                        ).WithSuggestion("Choose either --blocked-by or --blocks, not both")
+                }</span>
+
+                // Parse dependency issue references
+                <span class="cov0" title="0">var dependencyRefs []string
+                if removeBlockedBy != "" </span><span class="cov0" title="0">{
+                        dependencyRefs = strings.Split(removeBlockedBy, ",")
+                }</span> else<span class="cov0" title="0"> {
+                        dependencyRefs = strings.Split(removeBlocks, ",")
+                }</span>
+
+                // Validate all dependency references
+                <span class="cov0" title="0">for _, ref := range dependencyRefs </span><span class="cov0" title="0">{
+                        ref = strings.TrimSpace(ref)
+                        if ref == "" </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+                        <span class="cov0" title="0">_, _, err := pkg.ParseIssueReference(ref)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                }
+
+                // TODO: Implement remove functionality
+                <span class="cov0" title="0">if removeBlockedBy != "" </span><span class="cov0" title="0">{
+                        return pkg.WrapInternalError(
+                                "removing blocked-by dependencies",
+                                fmt.Errorf("remove command not implemented yet: removing issue %d blocked by %s", issueNum, removeBlockedBy),
+                        ).WithSuggestion("This feature is currently under development")
+                }</span> else<span class="cov0" title="0"> {
+                        return pkg.WrapInternalError(
+                                "removing blocks dependencies",
+                                fmt.Errorf("remove command not implemented yet: removing issue %d blocks %s", issueNum, removeBlocks),
+                        ).WithSuggestion("This feature is currently under development")
+                }</span>
+        },
+}
+
+// Flags for remove command
+var (
+        // removeBlockedBy contains a comma-separated list of issue references to remove
+        // from blocking the target issue. This will remove the "blocked by" relationship.
+        removeBlockedBy string
+        
+        // removeBlocks contains a comma-separated list of issue references to remove
+        // from being blocked by the target issue. This will remove the "blocks" relationship.
+        removeBlocks string
+)
+
+// init registers the remove command with the root command and sets up its flags.
+func init() <span class="cov8" title="1">{
+        rootCmd.AddCommand(removeCmd)
+
+        // Local flags specific to the remove command
+        // Note: These flags are mutually exclusive - validation happens in the command logic
+        removeCmd.Flags().StringVar(&amp;removeBlockedBy, "blocked-by", "", "Issue number(s) to remove from blocking this issue (comma-separated)")
+        removeCmd.Flags().StringVar(&amp;removeBlocks, "blocks", "", "Issue number(s) to remove from being blocked by this issue (comma-separated)")
+}</pre>
+		
+		<pre class="file" id="file3" style="display: none">// Package cmd implements all CLI commands for the gh-issue-dependency extension.
+//
+// This package contains the command-line interface built with Cobra, including
+// the root command and all subcommands (list, add, remove). Each command
+// handles user input validation, interacts with the GitHub API through the
+// pkg package, and provides structured error messages.
+package cmd
+
+import (
+        "fmt"
+        "os"
+
+        "github.com/spf13/cobra"
+        "github.com/torynet/gh-issue-dependency/pkg"
+)
+
+// Version contains the current version of the application.
+// This is set during build time and displayed in version output.
+var Version = "dev"
+
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &amp;cobra.Command{
+        Use:   "gh-issue-dependency",
+        Short: "Manage GitHub issue dependencies",
+        Long: `Manage issue dependencies in GitHub repositories using GitHub's native dependency API.
+
+This extension helps you organize complex projects by creating dependency relationships
+between issues, whether in the same repository or across different repositories.
+
+USAGE
+  gh issue-dependency &lt;command&gt;
+
+CORE COMMANDS
+  list     List issue dependencies and relationships
+  add      Add dependency relationships between issues
+  remove   Remove existing dependency relationships
+
+FLAGS
+  -R, --repo OWNER/REPO   Select repository using OWNER/REPO format
+
+EXAMPLES
+  # List all dependencies for issue #123
+  gh issue-dependency list 123
+
+  # Make issue #123 depend on issue #456  
+  gh issue-dependency add 123 --blocked-by 456
+
+  # Remove a dependency relationship
+  gh issue-dependency remove 123 --blocked-by 456
+
+  # Work with issues in a different repository
+  gh issue-dependency list 123 --repo owner/other-repo
+
+AUTHENTICATION
+  This extension uses the same authentication as the GitHub CLI. Run 'gh auth status' 
+  to check your authentication status. Use 'gh auth login' if you need to authenticate.
+
+LEARN MORE
+  Use 'gh issue-dependency &lt;command&gt; --help' for more information about a specific command.`,
+        Version: Version,
+        Run: func(cmd *cobra.Command, args []string) <span class="cov0" title="0">{
+                // If no subcommand is specified, show help
+                cmd.Help()
+        }</span>,
+}
+
+// Global flags accessible to all commands
+var repoFlag string
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+//
+// Returns an exit code following GitHub CLI conventions:
+//   - 0: Success
+//   - 1: General error
+//   - 2: Invalid input/validation error
+//   - 3: Permission denied
+//   - 4: Authentication required
+func Execute() int <span class="cov8" title="1">{
+        if err := rootCmd.Execute(); err != nil </span><span class="cov0" title="0">{
+                // Use our structured error formatting for user-friendly messages
+                fmt.Fprintf(os.Stderr, "%s\n", pkg.FormatUserError(err))
+                
+                // Return appropriate exit codes based on error type
+                switch pkg.GetErrorType(err) </span>{
+                case pkg.ErrorTypeAuthentication:<span class="cov0" title="0">
+                        return 4</span> // Authentication required
+                case pkg.ErrorTypePermission:<span class="cov0" title="0">
+                        return 3</span> // Permission denied
+                case pkg.ErrorTypeValidation:<span class="cov0" title="0">
+                        return 2</span> // Invalid input
+                default:<span class="cov0" title="0">
+                        return 1</span> // General error
+                }
+        }
+        <span class="cov8" title="1">return 0</span>
+}
+
+// init initializes the root command with global flags and configuration.
+// This function is called automatically when the package is imported.
+func init() <span class="cov8" title="1">{
+        // Global flags available to all commands
+        rootCmd.PersistentFlags().StringVarP(&amp;repoFlag, "repo", "R", "", "Select another repository using the [HOST/]OWNER/REPO format")
+
+        // Configure version output template to match GitHub CLI style
+        rootCmd.SetVersionTemplate("gh-issue-dependency version {{.Version}}\n")
+}</pre>
+		
+		<pre class="file" id="file4" style="display: none">// Package main provides the entry point for the gh-issue-dependency GitHub CLI extension.
+//
+// This extension allows users to manage issue dependencies in GitHub repositories
+// using GitHub's native dependency API. It provides commands to list, add, and
+// remove dependency relationships between issues, both within the same repository
+// and across different repositories.
+package main
+
+import (
+        "os"
+
+        "github.com/torynet/gh-issue-dependency/cmd"
+)
+
+// main is the application entry point that executes the root command and
+// exits with the appropriate status code based on command execution results.
+//
+// Exit codes follow GitHub CLI conventions:
+//   - 0: Success
+//   - 1: General error
+//   - 2: Invalid input/validation error
+//   - 3: Permission denied
+//   - 4: Authentication required
+func main() <span class="cov0" title="0">{
+        code := cmd.Execute()
+        os.Exit(code)
+}</span>
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package pkg
+
+import (
+        "errors"
+        "fmt"
+        "net/http"
+        "strconv"
+        "strings"
+)
+
+// Error Handling and User-Friendly Error Messages
+//
+// This file provides structured error handling with contextual information
+// and user-friendly error messages. It categorizes errors by type and provides
+// specific suggestions for resolution.
+
+// ErrorType represents the category of error for proper handling.
+// This allows the CLI to determine appropriate exit codes and error formatting.
+type ErrorType string
+
+const (
+        ErrorTypeAuthentication ErrorType = "authentication"
+        ErrorTypePermission     ErrorType = "permission"
+        ErrorTypeNetwork        ErrorType = "network"
+        ErrorTypeValidation     ErrorType = "validation"
+        ErrorTypeAPI            ErrorType = "api"
+        ErrorTypeRepository     ErrorType = "repository"
+        ErrorTypeIssue          ErrorType = "issue"
+        ErrorTypeInternal       ErrorType = "internal"
+)
+
+// AppError represents a structured error with context and user guidance.
+// This is the primary error type used throughout the application to provide
+// consistent, user-friendly error messages with actionable suggestions.
+type AppError struct {
+        Type        ErrorType         // Category of error for exit code determination
+        Message     string            // User-facing error message
+        Cause       error             // Underlying error that caused this error
+        Context     map[string]string // Additional context information (repository, issue, etc.)
+        Suggestions []string          // Actionable suggestions for resolving the error
+}
+
+func (e *AppError) Error() string <span class="cov8" title="1">{
+        return e.Message
+}</span>
+
+func (e *AppError) Unwrap() error <span class="cov0" title="0">{
+        return e.Cause
+}</span>
+
+// NewAppError creates a new structured application error
+func NewAppError(errType ErrorType, message string, cause error) *AppError <span class="cov8" title="1">{
+        return &amp;AppError{
+                Type:    errType,
+                Message: message,
+                Cause:   cause,
+                Context: make(map[string]string),
+        }
+}</span>
+
+// WithContext adds contextual information to an error
+func (e *AppError) WithContext(key, value string) *AppError <span class="cov8" title="1">{
+        e.Context[key] = value
+        return e
+}</span>
+
+// WithSuggestion adds a recovery suggestion to an error
+func (e *AppError) WithSuggestion(suggestion string) *AppError <span class="cov8" title="1">{
+        e.Suggestions = append(e.Suggestions, suggestion)
+        return e
+}</span>
+
+// Authentication Errors
+func WrapAuthError(err error) *AppError <span class="cov8" title="1">{
+        return NewAppError(
+                ErrorTypeAuthentication,
+                "Authentication required to access GitHub",
+                err,
+        ).WithSuggestion("Run 'gh auth login' to authenticate with GitHub")
+}</span>
+
+func NewAuthTokenError() *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypeAuthentication,
+                "Invalid or expired GitHub token",
+                nil,
+        ).WithSuggestion("Run 'gh auth login' to refresh your authentication")
+}</span>
+
+// Permission Errors
+func WrapPermissionError(repo string, err error) *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypePermission,
+                fmt.Sprintf("Insufficient permissions to access %s", repo),
+                err,
+        ).WithContext("repository", repo).
+                WithSuggestion("Ensure you have at least triage permissions for this repository").
+                WithSuggestion("Contact the repository owner to request access")
+}</span>
+
+func NewPermissionDeniedError(operation, repo string) *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypePermission,
+                fmt.Sprintf("Permission denied: cannot %s in %s", operation, repo),
+                nil,
+        ).WithContext("operation", operation).
+                WithContext("repository", repo).
+                WithSuggestion("Verify you have the required permissions for this operation")
+}</span>
+
+// Network Errors
+func WrapNetworkError(err error) *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypeNetwork,
+                "Network error occurred while connecting to GitHub",
+                err,
+        ).WithSuggestion("Check your internet connection and retry").
+                WithSuggestion("Verify GitHub's service status at https://www.githubstatus.com/")
+}</span>
+
+func NewTimeoutError(operation string) *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypeNetwork,
+                fmt.Sprintf("Request timed out while %s", operation),
+                nil,
+        ).WithContext("operation", operation).
+                WithSuggestion("Retry the operation").
+                WithSuggestion("Check your network connection")
+}</span>
+
+// Validation Errors
+func WrapValidationError(field, value string, err error) *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypeValidation,
+                fmt.Sprintf("Invalid %s: %s", field, value),
+                err,
+        ).WithContext("field", field).
+                WithContext("value", value)
+}</span>
+
+func NewIssueNumberValidationError(value string) *AppError <span class="cov8" title="1">{
+        return NewAppError(
+                ErrorTypeValidation,
+                fmt.Sprintf("Invalid issue number format: %s (expected number or GitHub URL)", value),
+                nil,
+        ).WithContext("input", value).
+                WithSuggestion("Use a numeric issue number (e.g., 123)").
+                WithSuggestion("Use a GitHub issue URL (e.g., https://github.com/owner/repo/issues/123)").
+                WithSuggestion("Use owner/repo#123 format for cross-repository references")
+}</span>
+
+func NewRepositoryFormatError(value string) *AppError <span class="cov8" title="1">{
+        return NewAppError(
+                ErrorTypeValidation,
+                fmt.Sprintf("Invalid repository format: %s", value),
+                nil,
+        ).WithContext("input", value).
+                WithSuggestion("Use OWNER/REPO format (e.g., octocat/Hello-World)").
+                WithSuggestion("Use full GitHub URL (e.g., https://github.com/octocat/Hello-World)")
+}</span>
+
+func NewEmptyValueError(field string) *AppError <span class="cov8" title="1">{
+        return NewAppError(
+                ErrorTypeValidation,
+                fmt.Sprintf("%s cannot be empty", field),
+                nil,
+        ).WithContext("field", field)
+}</span>
+
+// API Errors
+func WrapAPIError(statusCode int, err error) *AppError <span class="cov8" title="1">{
+        switch statusCode </span>{
+        case http.StatusUnauthorized:<span class="cov8" title="1">
+                return WrapAuthError(err)</span>
+        case http.StatusForbidden:<span class="cov8" title="1">
+                return NewAppError(
+                        ErrorTypePermission,
+                        "Access forbidden: insufficient permissions",
+                        err,
+                ).WithSuggestion("Verify your permissions for this resource")</span>
+        case http.StatusNotFound:<span class="cov8" title="1">
+                return NewAppError(
+                        ErrorTypeAPI,
+                        "Resource not found",
+                        err,
+                ).WithSuggestion("Verify the repository and issue numbers exist").
+                        WithSuggestion("Check if the repository is public or you have access")</span>
+        case http.StatusTooManyRequests:<span class="cov8" title="1">
+                return NewAppError(
+                        ErrorTypeAPI,
+                        "API rate limit exceeded",
+                        err,
+                ).WithSuggestion("Wait a few minutes before retrying").
+                        WithSuggestion("Consider using authentication for higher rate limits")</span>
+        case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable:<span class="cov8" title="1">
+                return NewAppError(
+                        ErrorTypeAPI,
+                        "GitHub API is temporarily unavailable",
+                        err,
+                ).WithSuggestion("Retry the operation in a few moments").
+                        WithSuggestion("Check GitHub's service status at https://www.githubstatus.com/")</span>
+        default:<span class="cov8" title="1">
+                return NewAppError(
+                        ErrorTypeAPI,
+                        fmt.Sprintf("API request failed with status %d", statusCode),
+                        err,
+                ).WithContext("status_code", strconv.Itoa(statusCode))</span>
+        }
+}
+
+// Repository Errors
+func NewRepositoryNotFoundError(repo string) *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypeRepository,
+                fmt.Sprintf("Repository not found: %s", repo),
+                nil,
+        ).WithContext("repository", repo).
+                WithSuggestion("Verify the repository name is spelled correctly").
+                WithSuggestion("Check if the repository exists and is accessible to you").
+                WithSuggestion("Use the --repo flag to specify a different repository")
+}</span>
+
+func NewRepositoryAccessError(repo string, err error) *AppError <span class="cov8" title="1">{
+        return NewAppError(
+                ErrorTypeRepository,
+                fmt.Sprintf("Cannot access repository: %s", repo),
+                err,
+        ).WithContext("repository", repo).
+                WithSuggestion("Verify you have access to this repository").
+                WithSuggestion("Check if the repository is private and you're authenticated")
+}</span>
+
+// Issue Errors
+func NewIssueNotFoundError(repo string, issueNumber int) *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypeIssue,
+                fmt.Sprintf("Issue #%d not found in %s", issueNumber, repo),
+                nil,
+        ).WithContext("repository", repo).
+                WithContext("issue_number", strconv.Itoa(issueNumber)).
+                WithSuggestion("Verify the issue number exists in the repository").
+                WithSuggestion("Check if you have access to view the issue")
+}</span>
+
+func NewDependencyExistsError(issueA, issueB string) *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypeIssue,
+                fmt.Sprintf("Dependency already exists between %s and %s", issueA, issueB),
+                nil,
+        ).WithContext("issue_a", issueA).
+                WithContext("issue_b", issueB).
+                WithSuggestion("Use 'gh issue-dependency list' to view existing dependencies")
+}</span>
+
+func NewCircularDependencyError(issueA, issueB string) *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypeIssue,
+                fmt.Sprintf("Cannot create circular dependency between %s and %s", issueA, issueB),
+                nil,
+        ).WithContext("issue_a", issueA).
+                WithContext("issue_b", issueB).
+                WithSuggestion("Review the dependency chain to resolve circular references")
+}</span>
+
+// Internal Errors
+func WrapInternalError(operation string, err error) *AppError <span class="cov0" title="0">{
+        return NewAppError(
+                ErrorTypeInternal,
+                fmt.Sprintf("Internal error during %s", operation),
+                err,
+        ).WithContext("operation", operation).
+                WithSuggestion("This appears to be a bug. Please report it with the error details")
+}</span>
+
+// Error Formatting and User Display
+func FormatUserError(err error) string <span class="cov8" title="1">{
+        var appErr *AppError
+        if !errors.As(err, &amp;appErr) </span><span class="cov8" title="1">{
+                // Fallback for non-AppError types
+                return fmt.Sprintf("Error: %v", err)
+        }</span>
+
+        <span class="cov8" title="1">var output strings.Builder
+        output.WriteString(fmt.Sprintf("Error: %s", appErr.Message))
+
+        // Add context if available
+        if len(appErr.Context) &gt; 0 </span><span class="cov8" title="1">{
+                output.WriteString("\n\nDetails:")
+                for key, value := range appErr.Context </span><span class="cov8" title="1">{
+                        output.WriteString(fmt.Sprintf("\n  %s: %s", key, value))
+                }</span>
+        }
+
+        // Add suggestions if available
+        <span class="cov8" title="1">if len(appErr.Suggestions) &gt; 0 </span><span class="cov8" title="1">{
+                output.WriteString("\n\nSuggestions:")
+                for _, suggestion := range appErr.Suggestions </span><span class="cov8" title="1">{
+                        output.WriteString(fmt.Sprintf("\n  • %s", suggestion))
+                }</span>
+        }
+
+        <span class="cov8" title="1">return output.String()</span>
+}
+
+// IsErrorType checks if an error is of a specific type
+func IsErrorType(err error, errType ErrorType) bool <span class="cov8" title="1">{
+        var appErr *AppError
+        if errors.As(err, &amp;appErr) </span><span class="cov8" title="1">{
+                return appErr.Type == errType
+        }</span>
+        <span class="cov8" title="1">return false</span>
+}
+
+// GetErrorType returns the error type, or ErrorTypeInternal if not an AppError
+func GetErrorType(err error) ErrorType <span class="cov8" title="1">{
+        var appErr *AppError
+        if errors.As(err, &amp;appErr) </span><span class="cov8" title="1">{
+                return appErr.Type
+        }</span>
+        <span class="cov8" title="1">return ErrorTypeInternal</span>
+}
+
+// Error handling utilities for common patterns
+
+// HandleHTTPError converts HTTP response errors to appropriate AppErrors
+func HandleHTTPError(resp *http.Response, operation string) error <span class="cov0" title="0">{
+        if resp.StatusCode &gt;= 200 &amp;&amp; resp.StatusCode &lt; 300 </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        <span class="cov0" title="0">switch resp.StatusCode </span>{
+        case http.StatusUnauthorized:<span class="cov0" title="0">
+                return WrapAuthError(fmt.Errorf("HTTP %d", resp.StatusCode))</span>
+        case http.StatusForbidden:<span class="cov0" title="0">
+                return WrapPermissionError("repository", fmt.Errorf("HTTP %d", resp.StatusCode))</span>
+        case http.StatusNotFound:<span class="cov0" title="0">
+                return NewAppError(
+                        ErrorTypeAPI,
+                        fmt.Sprintf("Resource not found during %s", operation),
+                        fmt.Errorf("HTTP %d", resp.StatusCode),
+                ).WithContext("operation", operation)</span>
+        default:<span class="cov0" title="0">
+                return WrapAPIError(resp.StatusCode, fmt.Errorf("HTTP %d", resp.StatusCode))</span>
+        }
+}
+
+// ParseIssueReference parses various issue reference formats and validates them
+func ParseIssueReference(ref string) (repo string, issueNum int, err error) <span class="cov8" title="1">{
+        if ref == "" </span><span class="cov8" title="1">{
+                return "", 0, NewEmptyValueError("issue reference")
+        }</span>
+
+        // Handle numeric issue numbers
+        <span class="cov8" title="1">if num, err := strconv.Atoi(ref); err == nil </span><span class="cov8" title="1">{
+                if num &lt;= 0 </span><span class="cov8" title="1">{
+                        return "", 0, NewIssueNumberValidationError(ref)
+                }</span>
+                <span class="cov8" title="1">return "", num, nil</span>
+        }
+
+        // Handle owner/repo#123 format
+        <span class="cov8" title="1">if strings.Contains(ref, "#") </span><span class="cov8" title="1">{
+                parts := strings.Split(ref, "#")
+                if len(parts) != 2 </span><span class="cov0" title="0">{
+                        return "", 0, NewIssueNumberValidationError(ref)
+                }</span>
+
+                <span class="cov8" title="1">repo = parts[0]
+                if repo == "" </span><span class="cov0" title="0">{
+                        return "", 0, NewIssueNumberValidationError(ref)
+                }</span>
+
+                <span class="cov8" title="1">num, err := strconv.Atoi(parts[1])
+                if err != nil || num &lt;= 0 </span><span class="cov0" title="0">{
+                        return "", 0, NewIssueNumberValidationError(ref)
+                }</span>
+
+                // Validate repo format
+                <span class="cov8" title="1">if !strings.Contains(repo, "/") </span><span class="cov8" title="1">{
+                        return "", 0, NewRepositoryFormatError(repo)
+                }</span>
+
+                <span class="cov8" title="1">return repo, num, nil</span>
+        }
+
+        // Handle GitHub URLs
+        <span class="cov8" title="1">if strings.HasPrefix(ref, "https://github.com/") </span><span class="cov8" title="1">{
+                // Extract from URL format: https://github.com/owner/repo/issues/123
+                parts := strings.Split(strings.TrimPrefix(ref, "https://github.com/"), "/")
+                if len(parts) &lt; 4 || parts[2] != "issues" </span><span class="cov0" title="0">{
+                        return "", 0, NewIssueNumberValidationError(ref)
+                }</span>
+
+                <span class="cov8" title="1">repo = parts[0] + "/" + parts[1]
+                num, err := strconv.Atoi(parts[3])
+                if err != nil || num &lt;= 0 </span><span class="cov0" title="0">{
+                        return "", 0, NewIssueNumberValidationError(ref)
+                }</span>
+
+                <span class="cov8" title="1">return repo, num, nil</span>
+        }
+
+        <span class="cov8" title="1">return "", 0, NewIssueNumberValidationError(ref)</span>
+}
+
+// ValidateRepository validates repository name format
+func ValidateRepository(repo string) error <span class="cov8" title="1">{
+        if repo == "" </span><span class="cov8" title="1">{
+                return NewEmptyValueError("repository")
+        }</span>
+
+        <span class="cov8" title="1">if !strings.Contains(repo, "/") </span><span class="cov8" title="1">{
+                return NewRepositoryFormatError(repo)
+        }</span>
+
+        <span class="cov8" title="1">parts := strings.Split(repo, "/")
+        if len(parts) != 2 || parts[0] == "" || parts[1] == "" </span><span class="cov8" title="1">{
+                return NewRepositoryFormatError(repo)
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}</pre>
+		
+		<pre class="file" id="file6" style="display: none">// Package pkg provides shared utilities and types for the gh-issue-dependency extension.
+//
+// This package contains GitHub API integration, error handling, repository context
+// detection, and other common functionality used across all commands.
+package pkg
+
+import (
+        "context"
+        "crypto/md5"
+        "encoding/json"
+        "fmt"
+        "os"
+        "os/exec"
+        "path/filepath"
+        "regexp"
+        "strconv"
+        "strings"
+        "sync"
+        "time"
+
+        "github.com/cli/go-gh/v2/pkg/api"
+)
+
+// RepoInfo represents repository information returned from GitHub API calls.
+// This structure is used for JSON unmarshaling of repository data.
+type RepoInfo struct {
+        Owner string `json:"owner"` // Repository owner (user or organization)
+        Name  string `json:"name"`  // Repository name
+}
+
+// GitHub API Data Structures for Issue Dependencies
+//
+// These structures model the GitHub API responses for issue dependency relationships
+// and issue details. They are used for marshaling API responses and providing
+// structured data to the output formatting system.
+
+// User represents a GitHub user or organization
+type User struct {
+        Login   string `json:"login"`
+        HTMLURL string `json:"html_url"`
+}
+
+// Label represents a GitHub issue label
+type Label struct {
+        Name        string `json:"name"`
+        Color       string `json:"color"`
+        Description string `json:"description"`
+}
+
+// Issue represents a GitHub issue with dependency-relevant fields
+type Issue struct {
+        Number    int      `json:"number"`
+        Title     string   `json:"title"`
+        State     string   `json:"state"`
+        Assignees []User   `json:"assignees"`
+        Labels    []Label  `json:"labels"`
+        HTMLURL   string   `json:"html_url"`
+        Repository string  `json:"repository,omitempty"` // Added for cross-repo dependencies
+}
+
+// DependencyRelation represents a relationship between issues
+type DependencyRelation struct {
+        Issue      Issue  `json:"issue"`
+        Type       string `json:"type"`       // "blocked_by" or "blocks"
+        Repository string `json:"repository"` // Repository of the related issue
+}
+
+// DependencyData contains all dependency information for an issue
+type DependencyData struct {
+        SourceIssue             Issue                 `json:"source_issue"`
+        BlockedBy               []DependencyRelation  `json:"blocked_by"`
+        Blocking                []DependencyRelation  `json:"blocking"`
+        FetchedAt               time.Time            `json:"fetched_at"`
+        TotalCount              int                  `json:"total_count"`
+        OriginalBlockedByCount  int                  `json:"original_blocked_by_count,omitempty"`
+        OriginalBlockingCount   int                  `json:"original_blocking_count,omitempty"`
+}
+
+// CacheEntry represents a cached dependency data entry
+type CacheEntry struct {
+        Data      DependencyData `json:"data"`
+        ExpiresAt time.Time      `json:"expires_at"`
+}
+
+// Cache configuration
+const (
+        CacheDir     = ".gh-issue-dependency-cache"
+        CacheDuration = 5 * time.Minute // Cache for 5 minutes
+)
+
+// Repository Context Detection
+//
+// These functions handle repository context detection following gh-sub-issue patterns.
+// They provide a consistent way to determine which repository to work with based on
+// user input, current directory, and command-line flags.
+
+// GetCurrentRepo gets the current repository context using the GitHub CLI.
+// It uses 'gh repo view' to determine the repository based on the current working directory.
+// This function requires that the user is in a directory associated with a GitHub repository
+// and that they have authenticated with the GitHub CLI.
+//
+// Returns the repository owner and name, or an error if the repository cannot be determined.
+func GetCurrentRepo() (owner, repo string, err error) <span class="cov8" title="1">{
+        // Use gh CLI to get current repository context
+        cmd := exec.Command("gh", "repo", "view", "--json", "owner,name")
+        output, err := cmd.Output()
+        if err != nil </span><span class="cov0" title="0">{
+                // Check if gh CLI is available and user is authenticated
+                if isGhNotFound(err) </span><span class="cov0" title="0">{
+                        return "", "", NewAppError(
+                                ErrorTypeInternal,
+                                "GitHub CLI (gh) is not available",
+                                err,
+                        ).WithSuggestion("Install GitHub CLI from https://cli.github.com/").
+                                WithSuggestion("Ensure 'gh' is in your PATH")
+                }</span>
+                
+                <span class="cov0" title="0">if isAuthError(err) </span><span class="cov0" title="0">{
+                        return "", "", WrapAuthError(err)
+                }</span>
+                
+                <span class="cov0" title="0">return "", "", NewRepositoryNotFoundError("current directory").
+                        WithSuggestion("Run this command from within a GitHub repository").
+                        WithSuggestion("Use the --repo flag to specify a repository explicitly")</span>
+        }
+
+        // Parse the JSON response
+        <span class="cov8" title="1">var repoData struct {
+                Owner struct {
+                        Login string `json:"login"`
+                } `json:"owner"`
+                Name string `json:"name"`
+        }
+        
+        if err := json.Unmarshal(output, &amp;repoData); err != nil </span><span class="cov0" title="0">{
+                return "", "", WrapInternalError("parsing repository information", err)
+        }</span>
+
+        <span class="cov8" title="1">return repoData.Owner.Login, repoData.Name, nil</span>
+}
+
+// ParseRepoFlag validates and parses the --repo flag value
+func ParseRepoFlag(repoFlag string) (owner, repo string, err error) <span class="cov8" title="1">{
+        if repoFlag == "" </span><span class="cov8" title="1">{
+                return "", "", NewEmptyValueError("repository")
+        }</span>
+
+        // Handle GitHub URL format: https://github.com/owner/repo
+        <span class="cov8" title="1">if strings.HasPrefix(repoFlag, "https://github.com/") </span><span class="cov8" title="1">{
+                parts := strings.Split(strings.TrimPrefix(repoFlag, "https://github.com/"), "/")
+                if len(parts) &lt; 2 </span><span class="cov8" title="1">{
+                        return "", "", NewRepositoryFormatError(repoFlag)
+                }</span>
+                <span class="cov8" title="1">return parts[0], parts[1], nil</span>
+        }
+
+        // Handle HOST/OWNER/REPO format (rare but supported by gh CLI)
+        <span class="cov8" title="1">parts := strings.Split(repoFlag, "/")
+        if len(parts) == 3 </span><span class="cov8" title="1">{
+                // Skip the host part and use owner/repo
+                return parts[1], parts[2], nil
+        }</span> else<span class="cov8" title="1"> if len(parts) == 2 </span><span class="cov8" title="1">{
+                // Standard OWNER/REPO format
+                return parts[0], parts[1], nil
+        }</span>
+
+        <span class="cov8" title="1">return "", "", NewRepositoryFormatError(repoFlag).
+                WithSuggestion("Use OWNER/REPO format (e.g., octocat/Hello-World)").
+                WithSuggestion("Use full GitHub URL (e.g., https://github.com/octocat/Hello-World)")</span>
+}
+
+// ParseIssueURL parses GitHub issue URLs to extract repository and issue number
+func ParseIssueURL(url string) (owner, repo string, issueNumber int, err error) <span class="cov8" title="1">{
+        if url == "" </span><span class="cov8" title="1">{
+                return "", "", 0, NewEmptyValueError("issue URL")
+        }</span>
+
+        // GitHub issue URL pattern: https://github.com/owner/repo/issues/123
+        <span class="cov8" title="1">githubIssuePattern := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)(?:[/?#].*)?$`)
+        matches := githubIssuePattern.FindStringSubmatch(url)
+        
+        if matches == nil </span><span class="cov8" title="1">{
+                return "", "", 0, NewIssueNumberValidationError(url).
+                        WithSuggestion("Use a GitHub issue URL (e.g., https://github.com/owner/repo/issues/123)")
+        }</span>
+
+        <span class="cov8" title="1">owner = matches[1]
+        repo = matches[2]
+        issueNumber, err = strconv.Atoi(matches[3])
+        if err != nil || issueNumber &lt;= 0 </span><span class="cov8" title="1">{
+                return "", "", 0, NewIssueNumberValidationError(url)
+        }</span>
+
+        <span class="cov8" title="1">return owner, repo, issueNumber, nil</span>
+}
+
+// ValidateRepoAccess validates that the user has access to the specified repository
+func ValidateRepoAccess(owner, repo string) error <span class="cov8" title="1">{
+        if owner == "" || repo == "" </span><span class="cov0" title="0">{
+                return NewEmptyValueError("repository owner or name")
+        }</span>
+
+        // Use gh CLI to check repository access
+        <span class="cov8" title="1">repoName := fmt.Sprintf("%s/%s", owner, repo)
+        cmd := exec.Command("gh", "repo", "view", repoName, "--json", "id")
+        output, err := cmd.Output()
+        if err != nil </span><span class="cov8" title="1">{
+                if isGhNotFound(err) </span><span class="cov0" title="0">{
+                        return NewAppError(
+                                ErrorTypeInternal,
+                                "GitHub CLI (gh) is not available",
+                                err,
+                        ).WithSuggestion("Install GitHub CLI from https://cli.github.com/")
+                }</span>
+                
+                <span class="cov8" title="1">if isAuthError(err) </span><span class="cov0" title="0">{
+                        return WrapAuthError(err)
+                }</span>
+                
+                // Check for specific error patterns
+                <span class="cov8" title="1">errMsg := strings.ToLower(err.Error())
+                if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "404") </span><span class="cov0" title="0">{
+                        return NewRepositoryNotFoundError(repoName)
+                }</span>
+                <span class="cov8" title="1">if strings.Contains(errMsg, "forbidden") || strings.Contains(errMsg, "403") </span><span class="cov0" title="0">{
+                        return WrapPermissionError(repoName, err)
+                }</span>
+                
+                <span class="cov8" title="1">return NewRepositoryAccessError(repoName, err)</span>
+        }
+
+        // Parse response to ensure we got valid repository data
+        <span class="cov0" title="0">var repoData struct {
+                ID string `json:"id"`
+        }
+        if err := json.Unmarshal(output, &amp;repoData); err != nil </span><span class="cov0" title="0">{
+                return WrapInternalError("parsing repository validation response", err)
+        }</span>
+
+        <span class="cov0" title="0">if repoData.ID == "" </span><span class="cov0" title="0">{
+                return NewRepositoryAccessError(repoName, 
+                        fmt.Errorf("repository validation returned empty ID"))
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+// ResolveRepository resolves repository context using the priority order:
+// 1. --repo flag (if provided)
+// 2. Issue URL parsing (if issue is URL)  
+// 3. Current repository detection via `gh repo view`
+// 4. Error if no context available
+func ResolveRepository(repoFlag, issueRef string) (owner, repo string, err error) <span class="cov8" title="1">{
+        // Priority 1: --repo flag override
+        if repoFlag != "" </span><span class="cov8" title="1">{
+                owner, repo, err = ParseRepoFlag(repoFlag)
+                if err != nil </span><span class="cov8" title="1">{
+                        return "", "", err
+                }</span>
+                // Validate access to the specified repository
+                <span class="cov8" title="1">if err := ValidateRepoAccess(owner, repo); err != nil </span><span class="cov8" title="1">{
+                        return "", "", err
+                }</span>
+                <span class="cov0" title="0">return owner, repo, nil</span>
+        }
+
+        // Priority 2: Issue URL parsing (if issue is URL)
+        <span class="cov8" title="1">if strings.HasPrefix(issueRef, "https://github.com/") </span><span class="cov8" title="1">{
+                var issueNumber int
+                owner, repo, issueNumber, err = ParseIssueURL(issueRef)
+                if err != nil </span><span class="cov0" title="0">{
+                        return "", "", err
+                }</span>
+                // Validate we got a valid issue number
+                <span class="cov8" title="1">if issueNumber &lt;= 0 </span><span class="cov0" title="0">{
+                        return "", "", NewIssueNumberValidationError(issueRef)
+                }</span>
+                // Validate access to the repository
+                <span class="cov8" title="1">if err := ValidateRepoAccess(owner, repo); err != nil </span><span class="cov8" title="1">{
+                        return "", "", err
+                }</span>
+                <span class="cov0" title="0">return owner, repo, nil</span>
+        }
+
+        // Priority 3: Current repository detection
+        <span class="cov8" title="1">owner, repo, err = GetCurrentRepo()
+        if err != nil </span><span class="cov0" title="0">{
+                return "", "", err
+        }</span>
+
+        <span class="cov8" title="1">return owner, repo, nil</span>
+}
+
+// Helper functions for error detection
+
+// isGhNotFound checks if the error indicates gh CLI is not available
+func isGhNotFound(err error) bool <span class="cov8" title="1">{
+        if err == nil </span><span class="cov8" title="1">{
+                return false
+        }</span>
+        <span class="cov8" title="1">errMsg := strings.ToLower(err.Error())
+        return strings.Contains(errMsg, "executable file not found") ||
+                   strings.Contains(errMsg, "command not found") ||
+                   strings.Contains(errMsg, "not recognized as an internal")</span>
+}
+
+// isAuthError checks if the error indicates authentication issues
+func isAuthError(err error) bool <span class="cov8" title="1">{
+        if err == nil </span><span class="cov8" title="1">{
+                return false
+        }</span>
+        <span class="cov8" title="1">errMsg := strings.ToLower(err.Error())
+        return strings.Contains(errMsg, "authentication") ||
+                   strings.Contains(errMsg, "unauthorized") ||
+                   strings.Contains(errMsg, "to authenticate") ||
+                   strings.Contains(errMsg, "gh auth login")</span>
+}
+
+// SetupGitHubClient sets up a GitHub API client using gh CLI's authentication
+func SetupGitHubClient() error <span class="cov8" title="1">{
+        // Verify gh CLI is available and authenticated
+        cmd := exec.Command("gh", "auth", "status")
+        if err := cmd.Run(); err != nil </span><span class="cov0" title="0">{
+                if isGhNotFound(err) </span><span class="cov0" title="0">{
+                        return NewAppError(
+                                ErrorTypeInternal,
+                                "GitHub CLI (gh) is not available",
+                                err,
+                        ).WithSuggestion("Install GitHub CLI from https://cli.github.com/").
+                                WithSuggestion("Ensure 'gh' is in your PATH")
+                }</span>
+                
+                <span class="cov0" title="0">return WrapAuthError(err).
+                        WithSuggestion("Run 'gh auth login' to authenticate with GitHub")</span>
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// GitHub API Integration for Issue Dependencies
+//
+// These functions implement the GitHub API integration for fetching issue dependency
+// relationships using the go-gh/v2 library. They handle parallel API calls, error
+// handling, and data transformation.
+
+// fetchIssueDetails retrieves issue details from the GitHub API
+func fetchIssueDetails(ctx context.Context, client *api.RESTClient, owner, repo string, issueNumber int) (*Issue, error) <span class="cov0" title="0">{
+        // API endpoint for issue details
+        endpoint := fmt.Sprintf("repos/%s/%s/issues/%d", owner, repo, issueNumber)
+        
+        var issue Issue
+        err := client.Get(endpoint, &amp;issue)
+        if err != nil </span><span class="cov0" title="0">{
+                // Handle specific error types
+                if strings.Contains(strings.ToLower(err.Error()), "not found") </span><span class="cov0" title="0">{
+                        return nil, NewIssueNotFoundError(fmt.Sprintf("%s/%s", owner, repo), issueNumber)
+                }</span>
+                <span class="cov0" title="0">if strings.Contains(strings.ToLower(err.Error()), "forbidden") </span><span class="cov0" title="0">{
+                        return nil, WrapPermissionError(fmt.Sprintf("%s/%s", owner, repo), err)
+                }</span>
+                <span class="cov0" title="0">if strings.Contains(strings.ToLower(err.Error()), "unauthorized") </span><span class="cov0" title="0">{
+                        return nil, WrapAuthError(err)
+                }</span>
+                <span class="cov0" title="0">if strings.Contains(strings.ToLower(err.Error()), "rate limit") </span><span class="cov0" title="0">{
+                        return nil, WrapAPIError(429, err)
+                }</span>
+                
+                <span class="cov0" title="0">return nil, WrapInternalError("fetching issue details", err)</span>
+        }
+        
+        // Add repository information for cross-repo support
+        <span class="cov0" title="0">issue.Repository = fmt.Sprintf("%s/%s", owner, repo)
+        
+        return &amp;issue, nil</span>
+}
+
+// fetchDependencyRelationships retrieves dependency relationships from GitHub API
+func fetchDependencyRelationships(ctx context.Context, client *api.RESTClient, owner, repo string, issueNumber int, relationType string) ([]DependencyRelation, error) <span class="cov0" title="0">{
+        // API endpoint for dependency relationships
+        endpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s", owner, repo, issueNumber, relationType)
+        
+        var relations []struct {
+                Issue Issue `json:"issue"`
+        }
+        
+        err := client.Get(endpoint, &amp;relations)
+        if err != nil </span><span class="cov0" title="0">{
+                // Handle specific error types
+                if strings.Contains(strings.ToLower(err.Error()), "not found") </span><span class="cov0" title="0">{
+                        // Issue doesn't exist or no dependencies - return empty slice
+                        return []DependencyRelation{}, nil
+                }</span>
+                <span class="cov0" title="0">if strings.Contains(strings.ToLower(err.Error()), "forbidden") </span><span class="cov0" title="0">{
+                        return nil, WrapPermissionError(fmt.Sprintf("%s/%s", owner, repo), err)
+                }</span>
+                <span class="cov0" title="0">if strings.Contains(strings.ToLower(err.Error()), "unauthorized") </span><span class="cov0" title="0">{
+                        return nil, WrapAuthError(err)
+                }</span>
+                <span class="cov0" title="0">if strings.Contains(strings.ToLower(err.Error()), "rate limit") </span><span class="cov0" title="0">{
+                        return nil, WrapAPIError(429, err)
+                }</span>
+                
+                <span class="cov0" title="0">return nil, WrapInternalError(fmt.Sprintf("fetching %s dependencies", relationType), err)</span>
+        }
+        
+        // Transform to DependencyRelation objects
+        <span class="cov0" title="0">var dependencies []DependencyRelation
+        for _, rel := range relations </span><span class="cov0" title="0">{
+                // Extract repository from issue HTML URL if available
+                repoName := fmt.Sprintf("%s/%s", owner, repo) // Default to current repo
+                if rel.Issue.HTMLURL != "" </span><span class="cov0" title="0">{
+                        if repoFromURL := extractRepoFromURL(rel.Issue.HTMLURL); repoFromURL != "" </span><span class="cov0" title="0">{
+                                repoName = repoFromURL
+                        }</span>
+                }
+                
+                <span class="cov0" title="0">dependencies = append(dependencies, DependencyRelation{
+                        Issue:      rel.Issue,
+                        Type:       relationType,
+                        Repository: repoName,
+                })</span>
+        }
+        
+        <span class="cov0" title="0">return dependencies, nil</span>
+}
+
+// extractRepoFromURL extracts repository name from GitHub issue URL
+func extractRepoFromURL(url string) string <span class="cov8" title="1">{
+        // Extract repo from URL format: https://github.com/owner/repo/issues/123
+        if !strings.HasPrefix(url, "https://github.com/") </span><span class="cov8" title="1">{
+                return ""
+        }</span>
+        
+        <span class="cov8" title="1">parts := strings.Split(strings.TrimPrefix(url, "https://github.com/"), "/")
+        if len(parts) &lt; 2 </span><span class="cov8" title="1">{
+                return ""
+        }</span>
+        
+        <span class="cov8" title="1">return parts[0] + "/" + parts[1]</span>
+}
+
+// fetchDependencies retrieves all dependency data for an issue using parallel API calls
+func fetchDependencies(ctx context.Context, owner, repo string, issueNumber int) (*DependencyData, error) <span class="cov0" title="0">{
+        // Create GitHub API client
+        client, err := api.DefaultRESTClient()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, WrapInternalError("creating GitHub API client", err)
+        }</span>
+        
+        // Create context with timeout
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+        defer cancel()
+        
+        // Channel for collecting results
+        type fetchResult struct {
+                sourceIssue *Issue
+                blockedBy   []DependencyRelation
+                blocking    []DependencyRelation
+                err         error
+        }
+        
+        resultChan := make(chan fetchResult, 3)
+        var wg sync.WaitGroup
+        
+        // Fetch source issue details
+        wg.Add(1)
+        go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                issue, err := fetchIssueDetails(ctx, client, owner, repo, issueNumber)
+                resultChan &lt;- fetchResult{sourceIssue: issue, err: err}
+        }</span>()
+        
+        // Fetch blocked_by relationships
+        <span class="cov0" title="0">wg.Add(1)
+        go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                relations, err := fetchDependencyRelationships(ctx, client, owner, repo, issueNumber, "blocked_by")
+                resultChan &lt;- fetchResult{blockedBy: relations, err: err}
+        }</span>()
+        
+        // Fetch blocking relationships  
+        <span class="cov0" title="0">wg.Add(1)
+        go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                relations, err := fetchDependencyRelationships(ctx, client, owner, repo, issueNumber, "blocking")
+                resultChan &lt;- fetchResult{blocking: relations, err: err}
+        }</span>()
+        
+        // Wait for all goroutines to complete
+        <span class="cov0" title="0">wg.Wait()
+        close(resultChan)
+        
+        // Collect results
+        var data DependencyData
+        data.FetchedAt = time.Now()
+        
+        for result := range resultChan </span><span class="cov0" title="0">{
+                if result.err != nil </span><span class="cov0" title="0">{
+                        return nil, result.err
+                }</span>
+                
+                <span class="cov0" title="0">if result.sourceIssue != nil </span><span class="cov0" title="0">{
+                        data.SourceIssue = *result.sourceIssue
+                }</span>
+                <span class="cov0" title="0">if result.blockedBy != nil </span><span class="cov0" title="0">{
+                        data.BlockedBy = result.blockedBy
+                }</span>
+                <span class="cov0" title="0">if result.blocking != nil </span><span class="cov0" title="0">{
+                        data.Blocking = result.blocking
+                }</span>
+        }
+        
+        // Calculate total count
+        <span class="cov0" title="0">data.TotalCount = len(data.BlockedBy) + len(data.Blocking)
+        
+        return &amp;data, nil</span>
+}
+
+// FetchIssueDependencies is the main exported function for retrieving dependency data
+func FetchIssueDependencies(ctx context.Context, owner, repo string, issueNumber int) (*DependencyData, error) <span class="cov8" title="1">{
+        // Validate inputs
+        if owner == "" || repo == "" </span><span class="cov8" title="1">{
+                return nil, NewEmptyValueError("repository owner or name")
+        }</span>
+        <span class="cov8" title="1">if issueNumber &lt;= 0 </span><span class="cov8" title="1">{
+                return nil, NewIssueNumberValidationError(strconv.Itoa(issueNumber))
+        }</span>
+        
+        // Try to get from cache first
+        <span class="cov8" title="1">cacheKey := getCacheKey(owner, repo, issueNumber)
+        if data, found := getFromCache(cacheKey); found </span><span class="cov0" title="0">{
+                return data, nil
+        }</span>
+        
+        // Verify GitHub CLI authentication
+        <span class="cov8" title="1">if err := SetupGitHubClient(); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        
+        // Validate repository access
+        <span class="cov8" title="1">if err := ValidateRepoAccess(owner, repo); err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        
+        // Fetch dependency data
+        <span class="cov0" title="0">data, err := fetchDependencies(ctx, owner, repo, issueNumber)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        
+        // Cache the result
+        <span class="cov0" title="0">saveToCache(cacheKey, data)
+        
+        return data, nil</span>
+}
+
+// getCacheKey generates a unique cache key for the request
+func getCacheKey(owner, repo string, issueNumber int) string <span class="cov8" title="1">{
+        key := fmt.Sprintf("%s/%s#%d", owner, repo, issueNumber)
+        hash := md5.Sum([]byte(key))
+        return fmt.Sprintf("%x", hash)
+}</span>
+
+// getCacheDir returns the cache directory path
+func getCacheDir() string <span class="cov8" title="1">{
+        homeDir, err := os.UserHomeDir()
+        if err != nil </span><span class="cov0" title="0">{
+                return CacheDir // fallback to relative path
+        }</span>
+        <span class="cov8" title="1">return filepath.Join(homeDir, CacheDir)</span>
+}
+
+// getFromCache attempts to retrieve data from cache
+func getFromCache(key string) (*DependencyData, bool) <span class="cov8" title="1">{
+        cacheDir := getCacheDir()
+        cachePath := filepath.Join(cacheDir, key+".json")
+        
+        // Check if cache file exists
+        if _, err := os.Stat(cachePath); os.IsNotExist(err) </span><span class="cov8" title="1">{
+                return nil, false
+        }</span>
+        
+        // Read cache file
+        <span class="cov0" title="0">data, err := os.ReadFile(cachePath)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, false
+        }</span>
+        
+        // Parse cache entry
+        <span class="cov0" title="0">var entry CacheEntry
+        if err := json.Unmarshal(data, &amp;entry); err != nil </span><span class="cov0" title="0">{
+                return nil, false
+        }</span>
+        
+        // Check if cache entry has expired
+        <span class="cov0" title="0">if time.Now().After(entry.ExpiresAt) </span><span class="cov0" title="0">{
+                // Remove expired cache file
+                os.Remove(cachePath)
+                return nil, false
+        }</span>
+        
+        <span class="cov0" title="0">return &amp;entry.Data, true</span>
+}
+
+// saveToCache stores data in cache
+func saveToCache(key string, data *DependencyData) <span class="cov0" title="0">{
+        cacheDir := getCacheDir()
+        
+        // Create cache directory if it doesn't exist
+        if err := os.MkdirAll(cacheDir, 0755); err != nil </span><span class="cov0" title="0">{
+                return // fail silently
+        }</span>
+        
+        // Create cache entry
+        <span class="cov0" title="0">entry := CacheEntry{
+                Data:      *data,
+                ExpiresAt: time.Now().Add(CacheDuration),
+        }
+        
+        // Marshal to JSON
+        jsonData, err := json.Marshal(entry)
+        if err != nil </span><span class="cov0" title="0">{
+                return // fail silently
+        }</span>
+        
+        // Write to cache file
+        <span class="cov0" title="0">cachePath := filepath.Join(cacheDir, key+".json")
+        os.WriteFile(cachePath, jsonData, 0644)</span>
+}
+
+// CleanExpiredCache removes expired cache entries
+func CleanExpiredCache() error <span class="cov0" title="0">{
+        cacheDir := getCacheDir()
+        
+        // Check if cache directory exists
+        if _, err := os.Stat(cacheDir); os.IsNotExist(err) </span><span class="cov0" title="0">{
+                return nil // no cache to clean
+        }</span>
+        
+        // Read cache directory
+        <span class="cov0" title="0">files, err := os.ReadDir(cacheDir)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        
+        <span class="cov0" title="0">now := time.Now()
+        for _, file := range files </span><span class="cov0" title="0">{
+                if !strings.HasSuffix(file.Name(), ".json") </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                
+                <span class="cov0" title="0">cachePath := filepath.Join(cacheDir, file.Name())
+                
+                // Read cache file
+                data, err := os.ReadFile(cachePath)
+                if err != nil </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                
+                // Parse cache entry
+                <span class="cov0" title="0">var entry CacheEntry
+                if err := json.Unmarshal(data, &amp;entry); err != nil </span><span class="cov0" title="0">{
+                        // Remove malformed cache files
+                        os.Remove(cachePath)
+                        continue</span>
+                }
+                
+                // Remove expired entries
+                <span class="cov0" title="0">if now.After(entry.ExpiresAt) </span><span class="cov0" title="0">{
+                        os.Remove(cachePath)
+                }</span>
+        }
+        
+        <span class="cov0" title="0">return nil</span>
+}</pre>
+		
+		<pre class="file" id="file7" style="display: none">// Package pkg provides output formatting for dependency data
+package pkg
+
+import (
+        "encoding/json"
+        "fmt"
+        "io"
+        "os"
+        "strings"
+        "time"
+
+        "github.com/mattn/go-isatty"
+        "github.com/muesli/termenv"
+)
+
+// OutputFormat represents the different output formats supported
+type OutputFormat int
+
+const (
+        FormatAuto OutputFormat = iota // Auto-detect based on TTY
+        FormatTTY                      // Rich TTY output with colors and emojis
+        FormatPlain                    // Plain text output
+        FormatJSON                     // JSON output
+        FormatCSV                      // CSV output
+)
+
+// OutputOptions contains configuration for output formatting
+type OutputOptions struct {
+        Format       OutputFormat
+        JSONFields   []string // Specific fields to include in JSON output
+        Detailed     bool     // Include detailed information
+        Writer       io.Writer
+        StateFilter  string   // Applied state filter for context-aware messaging
+        OriginalData *DependencyData // Original data before filtering for comparison
+}
+
+// DefaultOutputOptions returns sensible defaults for output options
+func DefaultOutputOptions() *OutputOptions <span class="cov8" title="1">{
+        return &amp;OutputOptions{
+                Format:       FormatAuto,
+                JSONFields:   []string{},
+                Detailed:     false,
+                Writer:       os.Stdout,
+                StateFilter:  "all",
+                OriginalData: nil,
+        }
+}</span>
+
+// OutputFormatter handles all output formatting operations
+type OutputFormatter struct {
+        options *OutputOptions
+        output  *termenv.Output
+}
+
+// NewOutputFormatter creates a new output formatter with the given options
+func NewOutputFormatter(options *OutputOptions) *OutputFormatter <span class="cov8" title="1">{
+        if options == nil </span><span class="cov8" title="1">{
+                options = DefaultOutputOptions()
+        }</span>
+
+        <span class="cov8" title="1">return &amp;OutputFormatter{
+                options: options,
+                output:  termenv.NewOutput(options.Writer),
+        }</span>
+}
+
+// IsTerminal detects if the output is going to a terminal/TTY
+func IsTerminal() bool <span class="cov8" title="1">{
+        return isatty.IsTerminal(os.Stdout.Fd())
+}</span>
+
+// determineFormat resolves the actual format to use based on options and environment
+func (f *OutputFormatter) determineFormat() OutputFormat <span class="cov8" title="1">{
+        switch f.options.Format </span>{
+        case FormatAuto:<span class="cov8" title="1">
+                if IsTerminal() </span><span class="cov0" title="0">{
+                        return FormatTTY
+                }</span>
+                <span class="cov8" title="1">return FormatPlain</span>
+        default:<span class="cov8" title="1">
+                return f.options.Format</span>
+        }
+}
+
+// FormatOutput formats dependency data according to the configured output format
+func (f *OutputFormatter) FormatOutput(data *DependencyData) error <span class="cov8" title="1">{
+        format := f.determineFormat()
+
+        // Add filter context if applicable
+        f.addFilterContext(data)
+
+        switch format </span>{
+        case FormatTTY:<span class="cov8" title="1">
+                return f.formatTTYOutput(data)</span>
+        case FormatPlain:<span class="cov8" title="1">
+                return f.formatPlainOutput(data)</span>
+        case FormatJSON:<span class="cov8" title="1">
+                return f.formatJSONOutput(data)</span>
+        case FormatCSV:<span class="cov8" title="1">
+                return f.formatCSVOutput(data)</span>
+        default:<span class="cov0" title="0">
+                return f.formatPlainOutput(data)</span>
+        }
+}
+
+// formatTTYOutput formats output for TTY with colors, emojis, and visual enhancements
+func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error <span class="cov8" title="1">{
+        // Color functions
+        title := f.colorize(termenv.ANSIBrightBlue)
+        header := f.colorize(termenv.ANSIYellow)
+        separator := f.colorize(termenv.ANSIBrightBlack)
+        info := f.colorize(termenv.ANSIBlue)
+        muted := f.colorize(termenv.ANSIBrightBlack)
+
+        // Issue title and header
+        fmt.Fprintf(f.options.Writer, "%s\nDependencies for: #%d - %s%s\n",
+                title(""), data.SourceIssue.Number, data.SourceIssue.Title, termenv.CSI+termenv.ResetSeq)
+
+        // Repository context
+        if data.SourceIssue.Repository != "" </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "%sRepository: %s%s\n",
+                        muted(""), data.SourceIssue.Repository, termenv.CSI+termenv.ResetSeq)
+        }</span>
+
+        <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")
+
+        // BLOCKED BY section
+        if len(data.BlockedBy) &gt; 0 </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "%sBLOCKED BY (%d issues)%s\n",
+                        header(""), len(data.BlockedBy), termenv.CSI+termenv.ResetSeq)
+                fmt.Fprintf(f.options.Writer, "%s────────────────────%s\n",
+                        separator(""), termenv.CSI+termenv.ResetSeq)
+
+                for _, dep := range data.BlockedBy </span><span class="cov8" title="1">{
+                        emoji := f.getStateEmoji(dep.Issue.State)
+                        stateColor := f.getStateColor(dep.Issue.State)
+                        
+                        fmt.Fprintf(f.options.Writer, "%s #%-6d %s %s[%s]%s",
+                                emoji, dep.Issue.Number, dep.Issue.Title,
+                                stateColor(""), dep.Issue.State, termenv.CSI+termenv.ResetSeq)
+
+                        // Show assignees if available
+                        if len(dep.Issue.Assignees) &gt; 0 </span><span class="cov8" title="1">{
+                                assigneeNames := make([]string, len(dep.Issue.Assignees))
+                                for i, assignee := range dep.Issue.Assignees </span><span class="cov8" title="1">{
+                                        assigneeNames[i] = "@" + assignee.Login
+                                }</span>
+                                <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, " %s%s%s",
+                                        info(""), strings.Join(assigneeNames, ", "), termenv.CSI+termenv.ResetSeq)</span>
+                        }
+
+                        // Show repository context for cross-repo dependencies
+                        <span class="cov8" title="1">if dep.Repository != data.SourceIssue.Repository </span><span class="cov8" title="1">{
+                                fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
+                                        muted(""), dep.Repository, termenv.CSI+termenv.ResetSeq)
+                        }</span>
+
+                        // Show URL for easy navigation
+                        <span class="cov8" title="1">if dep.Issue.HTMLURL != "" </span><span class="cov8" title="1">{
+                                fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
+                                        muted(""), dep.Issue.HTMLURL, termenv.CSI+termenv.ResetSeq)
+                        }</span>
+
+                        <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")</span>
+                }
+                <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")</span>
+        }
+
+        // BLOCKS section
+        <span class="cov8" title="1">if len(data.Blocking) &gt; 0 </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "%sBLOCKS (%d issues)%s\n",
+                        header(""), len(data.Blocking), termenv.CSI+termenv.ResetSeq)
+                fmt.Fprintf(f.options.Writer, "%s──────────────────%s\n",
+                        separator(""), termenv.CSI+termenv.ResetSeq)
+
+                for _, dep := range data.Blocking </span><span class="cov8" title="1">{
+                        emoji := f.getStateEmoji(dep.Issue.State)
+                        stateColor := f.getStateColor(dep.Issue.State)
+                        
+                        fmt.Fprintf(f.options.Writer, "%s #%-6d %s %s[%s]%s",
+                                emoji, dep.Issue.Number, dep.Issue.Title,
+                                stateColor(""), dep.Issue.State, termenv.CSI+termenv.ResetSeq)
+
+                        // Show assignees if available
+                        if len(dep.Issue.Assignees) &gt; 0 </span><span class="cov8" title="1">{
+                                assigneeNames := make([]string, len(dep.Issue.Assignees))
+                                for i, assignee := range dep.Issue.Assignees </span><span class="cov8" title="1">{
+                                        assigneeNames[i] = "@" + assignee.Login
+                                }</span>
+                                <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, " %s%s%s",
+                                        info(""), strings.Join(assigneeNames, ", "), termenv.CSI+termenv.ResetSeq)</span>
+                        }
+
+                        // Show repository context for cross-repo dependencies
+                        <span class="cov8" title="1">if dep.Repository != data.SourceIssue.Repository </span><span class="cov8" title="1">{
+                                fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
+                                        muted(""), dep.Repository, termenv.CSI+termenv.ResetSeq)
+                        }</span>
+
+                        // Show URL for easy navigation
+                        <span class="cov8" title="1">if dep.Issue.HTMLURL != "" </span><span class="cov8" title="1">{
+                                fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
+                                        muted(""), dep.Issue.HTMLURL, termenv.CSI+termenv.ResetSeq)
+                        }</span>
+
+                        <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")</span>
+                }
+                <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")</span>
+        }
+
+        // Empty state handling
+        <span class="cov8" title="1">if data.TotalCount == 0 </span><span class="cov8" title="1">{
+                mainMsg, tipMsg := f.getEmptyStateMessage(data)
+                fmt.Fprintf(f.options.Writer, "%s💡 %s%s\n\n",
+                        info(""), mainMsg, termenv.CSI+termenv.ResetSeq)
+                fmt.Fprintf(f.options.Writer, "%s%s%s\n",
+                        muted(""), tipMsg, termenv.CSI+termenv.ResetSeq)
+        }</span>
+
+        // Footer with metadata
+        <span class="cov8" title="1">if f.options.Detailed </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "%sFetched at: %s%s\n",
+                        muted(""), data.FetchedAt.Format(time.RFC3339), termenv.CSI+termenv.ResetSeq)
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// formatPlainOutput formats output for plain text without colors or emojis
+func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error <span class="cov8" title="1">{
+        // Header
+        fmt.Fprintf(f.options.Writer, "Dependencies for: #%d - %s\n",
+                data.SourceIssue.Number, data.SourceIssue.Title)
+
+        if data.SourceIssue.Repository != "" </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "Repository: %s\n", data.SourceIssue.Repository)
+        }</span>
+        <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")
+
+        // BLOCKED BY section
+        if len(data.BlockedBy) &gt; 0 </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "BLOCKED BY (%d issues)\n", len(data.BlockedBy))
+                fmt.Fprintf(f.options.Writer, "========================\n")
+
+                for _, dep := range data.BlockedBy </span><span class="cov8" title="1">{
+                        fmt.Fprintf(f.options.Writer, "#%d %s [%s]",
+                                dep.Issue.Number, dep.Issue.Title, dep.Issue.State)
+
+                        // Show assignees if available
+                        if len(dep.Issue.Assignees) &gt; 0 </span><span class="cov8" title="1">{
+                                assigneeNames := make([]string, len(dep.Issue.Assignees))
+                                for i, assignee := range dep.Issue.Assignees </span><span class="cov8" title="1">{
+                                        assigneeNames[i] = "@" + assignee.Login
+                                }</span>
+                                <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, " %s", strings.Join(assigneeNames, ", "))</span>
+                        }
+
+                        // Show repository context for cross-repo dependencies
+                        <span class="cov8" title="1">if dep.Repository != data.SourceIssue.Repository </span><span class="cov0" title="0">{
+                                fmt.Fprintf(f.options.Writer, "\n       Repository: %s", dep.Repository)
+                        }</span>
+
+                        // Show URL for easy navigation
+                        <span class="cov8" title="1">if dep.Issue.HTMLURL != "" </span><span class="cov8" title="1">{
+                                fmt.Fprintf(f.options.Writer, "\n       URL: %s", dep.Issue.HTMLURL)
+                        }</span>
+
+                        <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")</span>
+                }
+                <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")</span>
+        }
+
+        // BLOCKS section
+        <span class="cov8" title="1">if len(data.Blocking) &gt; 0 </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "BLOCKS (%d issues)\n", len(data.Blocking))
+                fmt.Fprintf(f.options.Writer, "==================\n")
+
+                for _, dep := range data.Blocking </span><span class="cov8" title="1">{
+                        fmt.Fprintf(f.options.Writer, "#%d %s [%s]",
+                                dep.Issue.Number, dep.Issue.Title, dep.Issue.State)
+
+                        // Show assignees if available
+                        if len(dep.Issue.Assignees) &gt; 0 </span><span class="cov8" title="1">{
+                                assigneeNames := make([]string, len(dep.Issue.Assignees))
+                                for i, assignee := range dep.Issue.Assignees </span><span class="cov8" title="1">{
+                                        assigneeNames[i] = "@" + assignee.Login
+                                }</span>
+                                <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, " %s", strings.Join(assigneeNames, ", "))</span>
+                        }
+
+                        // Show repository context for cross-repo dependencies
+                        <span class="cov8" title="1">if dep.Repository != data.SourceIssue.Repository </span><span class="cov8" title="1">{
+                                fmt.Fprintf(f.options.Writer, "\n       Repository: %s", dep.Repository)
+                        }</span>
+
+                        // Show URL for easy navigation
+                        <span class="cov8" title="1">if dep.Issue.HTMLURL != "" </span><span class="cov8" title="1">{
+                                fmt.Fprintf(f.options.Writer, "\n       URL: %s", dep.Issue.HTMLURL)
+                        }</span>
+
+                        <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")</span>
+                }
+                <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")</span>
+        }
+
+        // Empty state handling
+        <span class="cov8" title="1">if data.TotalCount == 0 </span><span class="cov8" title="1">{
+                mainMsg, tipMsg := f.getEmptyStateMessage(data)
+                fmt.Fprintf(f.options.Writer, "%s\n\n", mainMsg)
+                fmt.Fprintf(f.options.Writer, "%s\n", tipMsg)
+        }</span>
+
+        // Footer with metadata
+        <span class="cov8" title="1">if f.options.Detailed </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "Fetched at: %s\n", data.FetchedAt.Format(time.RFC3339))
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// formatJSONOutput formats output as JSON with optional field selection
+func (f *OutputFormatter) formatJSONOutput(data *DependencyData) error <span class="cov8" title="1">{
+        // Create output structure
+        output := map[string]interface{}{
+                "source_issue": f.formatIssueForJSON(&amp;data.SourceIssue),
+                "blocked_by":   f.formatDependenciesForJSON(data.BlockedBy),
+                "blocks":       f.formatDependenciesForJSON(data.Blocking),
+                "summary": map[string]interface{}{
+                        "total_count":      data.TotalCount,
+                        "blocked_by_count": len(data.BlockedBy),
+                        "blocks_count":     len(data.Blocking),
+                        "fetched_at":       data.FetchedAt.Format(time.RFC3339),
+                },
+        }
+
+        // Apply field selection if specified
+        if len(f.options.JSONFields) &gt; 0 </span><span class="cov8" title="1">{
+                filtered := make(map[string]interface{})
+                for _, field := range f.options.JSONFields </span><span class="cov8" title="1">{
+                        if value, exists := output[field]; exists </span><span class="cov8" title="1">{
+                                filtered[field] = value
+                        }</span>
+                }
+                <span class="cov8" title="1">output = filtered</span>
+        }
+
+        // Use Go's JSON encoder for consistent formatting
+        <span class="cov8" title="1">encoder := json.NewEncoder(f.options.Writer)
+        encoder.SetIndent("", "  ")
+        return encoder.Encode(output)</span>
+}
+
+// formatCSVOutput formats output as CSV (reuse existing implementation)
+func (f *OutputFormatter) formatCSVOutput(data *DependencyData) error <span class="cov8" title="1">{
+        // CSV header
+        if f.options.Detailed </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "type,repository,number,title,state,assignees,labels,html_url\n")
+        }</span> else<span class="cov8" title="1"> {
+                fmt.Fprintf(f.options.Writer, "type,repository,number,title,state\n")
+        }</span>
+
+        // Source issue
+        <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "source,%s,%d,%s,%s",
+                escapeCSV(data.SourceIssue.Repository),
+                data.SourceIssue.Number,
+                escapeCSV(data.SourceIssue.Title),
+                data.SourceIssue.State)
+
+        if f.options.Detailed </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, ",%s,%s,%s",
+                        escapeCSV(formatAssigneesForCSV(data.SourceIssue.Assignees)),
+                        escapeCSV(formatLabelsForCSV(data.SourceIssue.Labels)),
+                        escapeCSV(data.SourceIssue.HTMLURL))
+        }</span>
+        <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")
+
+        // Blocked by dependencies
+        for _, dep := range data.BlockedBy </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "blocked_by,%s,%d,%s,%s",
+                        escapeCSV(dep.Repository),
+                        dep.Issue.Number,
+                        escapeCSV(dep.Issue.Title),
+                        dep.Issue.State)
+
+                if f.options.Detailed </span><span class="cov8" title="1">{
+                        fmt.Fprintf(f.options.Writer, ",%s,%s,%s",
+                                escapeCSV(formatAssigneesForCSV(dep.Issue.Assignees)),
+                                escapeCSV(formatLabelsForCSV(dep.Issue.Labels)),
+                                escapeCSV(dep.Issue.HTMLURL))
+                }</span>
+                <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")</span>
+        }
+
+        // Blocking dependencies
+        <span class="cov8" title="1">for _, dep := range data.Blocking </span><span class="cov8" title="1">{
+                fmt.Fprintf(f.options.Writer, "blocking,%s,%d,%s,%s",
+                        escapeCSV(dep.Repository),
+                        dep.Issue.Number,
+                        escapeCSV(dep.Issue.Title),
+                        dep.Issue.State)
+
+                if f.options.Detailed </span><span class="cov8" title="1">{
+                        fmt.Fprintf(f.options.Writer, ",%s,%s,%s",
+                                escapeCSV(formatAssigneesForCSV(dep.Issue.Assignees)),
+                                escapeCSV(formatLabelsForCSV(dep.Issue.Labels)),
+                                escapeCSV(dep.Issue.HTMLURL))
+                }</span>
+                <span class="cov8" title="1">fmt.Fprintf(f.options.Writer, "\n")</span>
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// Helper functions for TTY output
+
+// colorize returns a function that applies the given color
+func (f *OutputFormatter) colorize(color termenv.Color) func(string) string <span class="cov8" title="1">{
+        return func(s string) string </span><span class="cov8" title="1">{
+                return termenv.String(s).Foreground(color).String()
+        }</span>
+}
+
+// getStateEmoji returns the appropriate emoji for the issue state
+func (f *OutputFormatter) getStateEmoji(state string) string <span class="cov8" title="1">{
+        switch strings.ToLower(state) </span>{
+        case "open":<span class="cov8" title="1">
+                return "🔵"</span>
+        case "closed":<span class="cov8" title="1">
+                return "✅"</span>
+        default:<span class="cov0" title="0">
+                return "⚪"</span>
+        }
+}
+
+// getStateColor returns the appropriate color function for the issue state
+func (f *OutputFormatter) getStateColor(state string) func(string) string <span class="cov8" title="1">{
+        switch strings.ToLower(state) </span>{
+        case "open":<span class="cov8" title="1">
+                return f.colorize(termenv.ANSIGreen)</span>
+        case "closed":<span class="cov8" title="1">
+                return f.colorize(termenv.ANSIBrightBlack)</span>
+        default:<span class="cov0" title="0">
+                return f.colorize(termenv.ANSIWhite)</span>
+        }
+}
+
+// Helper functions for JSON formatting
+
+// formatIssueForJSON formats a single issue for JSON output
+func (f *OutputFormatter) formatIssueForJSON(issue *Issue) map[string]interface{} <span class="cov8" title="1">{
+        result := map[string]interface{}{
+                "number":     issue.Number,
+                "title":      issue.Title,
+                "state":      issue.State,
+                "repository": issue.Repository,
+        }
+
+        if f.options.Detailed </span><span class="cov8" title="1">{
+                if len(issue.Assignees) &gt; 0 </span><span class="cov8" title="1">{
+                        result["assignees"] = formatAssigneesForJSON(issue.Assignees)
+                }</span>
+                <span class="cov8" title="1">if len(issue.Labels) &gt; 0 </span><span class="cov8" title="1">{
+                        result["labels"] = formatLabelsForJSON(issue.Labels)
+                }</span>
+                <span class="cov8" title="1">if issue.HTMLURL != "" </span><span class="cov8" title="1">{
+                        result["html_url"] = issue.HTMLURL
+                }</span>
+        }
+
+        <span class="cov8" title="1">return result</span>
+}
+
+// formatDependenciesForJSON formats dependency relations for JSON output
+func (f *OutputFormatter) formatDependenciesForJSON(deps []DependencyRelation) []map[string]interface{} <span class="cov8" title="1">{
+        var result []map[string]interface{}
+
+        for _, dep := range deps </span><span class="cov8" title="1">{
+                item := map[string]interface{}{
+                        "number":     dep.Issue.Number,
+                        "title":      dep.Issue.Title,
+                        "state":      dep.Issue.State,
+                        "repository": dep.Repository,
+                }
+
+                if f.options.Detailed </span><span class="cov8" title="1">{
+                        if len(dep.Issue.Assignees) &gt; 0 </span><span class="cov8" title="1">{
+                                item["assignees"] = formatAssigneesForJSON(dep.Issue.Assignees)
+                        }</span>
+                        <span class="cov8" title="1">if len(dep.Issue.Labels) &gt; 0 </span><span class="cov8" title="1">{
+                                item["labels"] = formatLabelsForJSON(dep.Issue.Labels)
+                        }</span>
+                        <span class="cov8" title="1">if dep.Issue.HTMLURL != "" </span><span class="cov8" title="1">{
+                                item["html_url"] = dep.Issue.HTMLURL
+                        }</span>
+                }
+
+                <span class="cov8" title="1">result = append(result, item)</span>
+        }
+
+        <span class="cov8" title="1">return result</span>
+}
+
+// escapeCSV escapes special characters in CSV values
+func escapeCSV(value string) string <span class="cov8" title="1">{
+        // If value contains comma, quote, or newline, wrap in quotes and escape internal quotes
+        needsQuoting := false
+        for _, char := range value </span><span class="cov8" title="1">{
+                if char == ',' || char == '"' || char == '\n' || char == '\r' </span><span class="cov8" title="1">{
+                        needsQuoting = true
+                        break</span>
+                }
+        }
+
+        <span class="cov8" title="1">if needsQuoting </span><span class="cov8" title="1">{
+                // Replace internal quotes with double quotes
+                escaped := ""
+                for _, char := range value </span><span class="cov8" title="1">{
+                        if char == '"' </span><span class="cov8" title="1">{
+                                escaped += "\"\""
+                        }</span> else<span class="cov8" title="1"> {
+                                escaped += string(char)
+                        }</span>
+                }
+                <span class="cov8" title="1">return "\"" + escaped + "\""</span>
+        }
+
+        <span class="cov8" title="1">return value</span>
+}
+
+// formatAssigneesForCSV converts assignees to CSV-friendly string
+func formatAssigneesForCSV(assignees []User) string <span class="cov8" title="1">{
+        if len(assignees) == 0 </span><span class="cov8" title="1">{
+                return ""
+        }</span>
+
+        <span class="cov8" title="1">var names []string
+        for _, user := range assignees </span><span class="cov8" title="1">{
+                names = append(names, "@"+user.Login)
+        }</span>
+        <span class="cov8" title="1">return joinStrings(names, "; ")</span>
+}
+
+// formatLabelsForCSV converts labels to CSV-friendly string
+func formatLabelsForCSV(labels []Label) string <span class="cov8" title="1">{
+        if len(labels) == 0 </span><span class="cov8" title="1">{
+                return ""
+        }</span>
+
+        <span class="cov8" title="1">var names []string
+        for _, label := range labels </span><span class="cov8" title="1">{
+                names = append(names, label.Name)
+        }</span>
+        <span class="cov8" title="1">return joinStrings(names, "; ")</span>
+}
+
+// joinStrings joins a slice of strings with a separator
+func joinStrings(items []string, separator string) string <span class="cov8" title="1">{
+        if len(items) == 0 </span><span class="cov0" title="0">{
+                return ""
+        }</span>
+
+        <span class="cov8" title="1">result := items[0]
+        for i := 1; i &lt; len(items); i++ </span><span class="cov8" title="1">{
+                result += separator + items[i]
+        }</span>
+        <span class="cov8" title="1">return result</span>
+}
+
+// formatAssigneesForJSON converts assignees to JSON-friendly format
+func formatAssigneesForJSON(assignees []User) []map[string]interface{} <span class="cov8" title="1">{
+        var result []map[string]interface{}
+
+        for _, user := range assignees </span><span class="cov8" title="1">{
+                result = append(result, map[string]interface{}{
+                        "login":    user.Login,
+                        "html_url": user.HTMLURL,
+                })
+        }</span>
+
+        <span class="cov8" title="1">return result</span>
+}
+
+// formatLabelsForJSON converts labels to JSON-friendly format
+func formatLabelsForJSON(labels []Label) []map[string]interface{} <span class="cov8" title="1">{
+        var result []map[string]interface{}
+
+        for _, label := range labels </span><span class="cov8" title="1">{
+                item := map[string]interface{}{
+                        "name":  label.Name,
+                        "color": label.Color,
+                }
+                if label.Description != "" </span><span class="cov8" title="1">{
+                        item["description"] = label.Description
+                }</span>
+                <span class="cov8" title="1">result = append(result, item)</span>
+        }
+
+        <span class="cov8" title="1">return result</span>
+}
+
+// addFilterContext adds filter context information to help with empty state messaging
+func (f *OutputFormatter) addFilterContext(data *DependencyData) <span class="cov8" title="1">{
+        // Store original data counts if we have it for comparison
+        if f.options.OriginalData != nil </span><span class="cov0" title="0">{
+                data.OriginalBlockedByCount = len(f.options.OriginalData.BlockedBy)
+                data.OriginalBlockingCount = len(f.options.OriginalData.Blocking)
+        }</span>
+}
+
+// getEmptyStateMessage returns context-aware empty state message
+func (f *OutputFormatter) getEmptyStateMessage(data *DependencyData) (string, string) <span class="cov8" title="1">{
+        var mainMsg, tipMsg string
+        
+        // Check if we have original data to compare against
+        hasOriginalData := f.options.OriginalData != nil &amp;&amp; 
+                (f.options.OriginalData.TotalCount &gt; data.TotalCount)
+        
+        switch f.options.StateFilter </span>{
+        case "open":<span class="cov8" title="1">
+                if hasOriginalData </span><span class="cov8" title="1">{
+                        closedCount := f.options.OriginalData.TotalCount - data.TotalCount
+                        mainMsg = fmt.Sprintf("No open dependencies found for issue #%d.", data.SourceIssue.Number)
+                        if closedCount &gt; 0 </span><span class="cov8" title="1">{
+                                tipMsg = fmt.Sprintf("Note: %d closed dependencies found. Use --state all to see all dependencies.", closedCount)
+                        }</span> else<span class="cov0" title="0"> {
+                                tipMsg = "No dependencies exist for this issue. Use 'gh issue-dependency add' to create relationships."
+                        }</span>
+                } else<span class="cov8" title="1"> {
+                        mainMsg = fmt.Sprintf("No open dependencies found for issue #%d.", data.SourceIssue.Number)
+                        tipMsg = "Use --state all to see closed dependencies, or --state closed for closed only."
+                }</span>
+                
+        case "closed":<span class="cov8" title="1">
+                if hasOriginalData </span><span class="cov0" title="0">{
+                        openCount := f.options.OriginalData.TotalCount - data.TotalCount
+                        mainMsg = fmt.Sprintf("No closed dependencies found for issue #%d.", data.SourceIssue.Number)
+                        if openCount &gt; 0 </span><span class="cov0" title="0">{
+                                tipMsg = fmt.Sprintf("Note: %d open dependencies found. Use --state all to see all dependencies.", openCount)
+                        }</span> else<span class="cov0" title="0"> {
+                                tipMsg = "No dependencies exist for this issue. Use 'gh issue-dependency add' to create relationships."
+                        }</span>
+                } else<span class="cov8" title="1"> {
+                        mainMsg = fmt.Sprintf("No closed dependencies found for issue #%d.", data.SourceIssue.Number)
+                        tipMsg = "Use --state all to see open dependencies, or --state open for open only."
+                }</span>
+                
+        default:<span class="cov8" title="1"> // "all"
+                mainMsg = fmt.Sprintf("No dependencies found for issue #%d.", data.SourceIssue.Number)
+                tipMsg = "Use 'gh issue-dependency add' to create dependency relationships."
+                if data.SourceIssue.Repository != "" </span><span class="cov8" title="1">{
+                        tipMsg += "\nNote: Some dependencies may exist in repositories you don't have access to."
+                }</span>
+        }
+        
+        <span class="cov8" title="1">return mainMsg, tipMsg</span>
+}
+
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
