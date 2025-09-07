@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/torynet/gh-issue-dependency/pkg"
@@ -28,7 +30,8 @@ and relationship type (blocking vs blocked).
 
 FLAGS
   --detailed       Show detailed dependency information including dates and users
-  --format string  Output format: table, json, csv (default "table")`,
+  --format string  Output format: table, json, csv (default "table")
+  --state string   Filter dependencies by issue state: all, open, closed (default "all")`,
 	Example: `  # List all dependencies for issue #123
   gh issue-dependency list 123
 
@@ -42,7 +45,13 @@ FLAGS
   gh issue-dependency list 123 --format json
 
   # Export dependencies to CSV for analysis
-  gh issue-dependency list 456 --format csv > dependencies.csv`,
+  gh issue-dependency list 456 --format csv > dependencies.csv
+
+  # Show only open dependencies
+  gh issue-dependency list 123 --state open
+
+  # List closed dependencies in JSON format
+  gh issue-dependency list 456 --state closed --format json`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]
@@ -81,15 +90,29 @@ FLAGS
 				WithSuggestion("Use one of: table, json, csv")
 		}
 
-		// TODO: Implement list functionality
-		// This will fetch dependency data from GitHub's API and format it
-		// according to the specified output format.
-		return pkg.WrapInternalError(
-			"listing dependencies",
-			fmt.Errorf("list command not implemented yet for issue #%d in %s/%s", issueNum, owner, repo),
-		).WithSuggestion("This feature is currently under development").
-			WithContext("repository", fmt.Sprintf("%s/%s", owner, repo)).
-			WithContext("issue", fmt.Sprintf("#%d", issueNum))
+		// Validate the state filter option against supported states.
+		// We support all (default), open, and closed states for filtering dependencies.
+		validStates := []string{"all", "open", "closed"}
+		isValidState := false
+		for _, state := range validStates {
+			if listState == state {
+				isValidState = true
+				break
+			}
+		}
+		if !isValidState {
+			return pkg.NewAppError(
+				pkg.ErrorTypeValidation,
+				fmt.Sprintf("Invalid state: %s", listState),
+				nil,
+			).WithContext("state", listState).
+				WithSuggestion("Use one of: all, open, closed")
+		}
+
+		// Display the command configuration to show what will be executed.
+		// This provides the foundation for dependency data display and confirms
+		// all argument parsing and validation is working correctly.
+		return displayListCommandSummary(owner, repo, issueNum, listFormat, listState, listDetailed)
 	},
 }
 
@@ -102,7 +125,65 @@ var (
 	// listFormat specifies the output format for dependency information.
 	// Supported formats: table (default), json, csv
 	listFormat string
+	
+	// listState filters dependencies by issue state.
+	// Supported states: all (default), open, closed
+	listState string
 )
+
+// displayListCommandSummary shows the foundation for dependency data display.
+// This function demonstrates the structure and validates that all argument parsing
+// and validation is working correctly. It will be replaced by actual GitHub API
+// integration in Issue #11.
+func displayListCommandSummary(owner, repo string, issueNum int, format, state string, detailed bool) error {
+	switch format {
+	case "json":
+		return displayJSONSummary(owner, repo, issueNum, state, detailed)
+	case "csv":
+		return displayCSVSummary(owner, repo, issueNum, state, detailed)
+	default: // table
+		return displayTableSummary(owner, repo, issueNum, state, detailed)
+	}
+}
+
+// displayTableSummary displays the command configuration in table format.
+// This shows the foundation for table-based dependency display.
+func displayTableSummary(owner, repo string, issueNum int, state string, detailed bool) error {
+	fmt.Printf("Dependencies for issue #%d in %s/%s\n", issueNum, owner, repo)
+	fmt.Printf("State filter: %s\n", state)
+	fmt.Printf("Detailed view: %v\n", detailed)
+	fmt.Printf("Output format: table\n")
+	fmt.Printf("\nReady for GitHub API integration (Issue #11)\n")
+	return nil
+}
+
+// displayJSONSummary displays the command configuration in JSON format.
+// This shows the foundation for JSON-based dependency display.
+func displayJSONSummary(owner, repo string, issueNum int, state string, detailed bool) error {
+	summary := map[string]interface{}{
+		"repository":  fmt.Sprintf("%s/%s", owner, repo),
+		"issue":      issueNum,
+		"state":      state,
+		"detailed":   detailed,
+		"format":     "json",
+		"status":     "ready_for_github_api_integration",
+		"next_issue": 11,
+	}
+	
+	// Use Go's JSON encoder for consistent formatting
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(summary)
+}
+
+// displayCSVSummary displays the command configuration in CSV format.
+// This shows the foundation for CSV-based dependency display.
+func displayCSVSummary(owner, repo string, issueNum int, state string, detailed bool) error {
+	fmt.Printf("repository,issue,state,detailed,format,status\n")
+	fmt.Printf("%s/%s,%d,%s,%v,csv,ready_for_github_api_integration\n", 
+		owner, repo, issueNum, state, detailed)
+	return nil
+}
 
 // init registers the list command with the root command and sets up its flags.
 func init() {
@@ -111,4 +192,5 @@ func init() {
 	// Local flags specific to the list command
 	listCmd.Flags().BoolVar(&listDetailed, "detailed", false, "Show detailed dependency information including dates and users")
 	listCmd.Flags().StringVar(&listFormat, "format", "table", "Output format: table (default), json, csv")
+	listCmd.Flags().StringVar(&listState, "state", "all", "Filter dependencies by issue state: all (default), open, closed")
 }
