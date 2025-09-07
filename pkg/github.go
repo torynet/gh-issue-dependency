@@ -5,12 +5,17 @@
 package pkg
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/cli/go-gh/v2/pkg/api"
 )
 
 // RepoInfo represents repository information returned from GitHub API calls.
@@ -18,6 +23,52 @@ import (
 type RepoInfo struct {
 	Owner string `json:"owner"` // Repository owner (user or organization)
 	Name  string `json:"name"`  // Repository name
+}
+
+// GitHub API Data Structures for Issue Dependencies
+//
+// These structures model the GitHub API responses for issue dependency relationships
+// and issue details. They are used for marshaling API responses and providing
+// structured data to the output formatting system.
+
+// User represents a GitHub user or organization
+type User struct {
+	Login   string `json:"login"`
+	HTMLURL string `json:"html_url"`
+}
+
+// Label represents a GitHub issue label
+type Label struct {
+	Name        string `json:"name"`
+	Color       string `json:"color"`
+	Description string `json:"description"`
+}
+
+// Issue represents a GitHub issue with dependency-relevant fields
+type Issue struct {
+	Number    int      `json:"number"`
+	Title     string   `json:"title"`
+	State     string   `json:"state"`
+	Assignees []User   `json:"assignees"`
+	Labels    []Label  `json:"labels"`
+	HTMLURL   string   `json:"html_url"`
+	Repository string  `json:"repository,omitempty"` // Added for cross-repo dependencies
+}
+
+// DependencyRelation represents a relationship between issues
+type DependencyRelation struct {
+	Issue      Issue  `json:"issue"`
+	Type       string `json:"type"`       // "blocked_by" or "blocks"
+	Repository string `json:"repository"` // Repository of the related issue
+}
+
+// DependencyData contains all dependency information for an issue
+type DependencyData struct {
+	SourceIssue   Issue                 `json:"source_issue"`
+	BlockedBy     []DependencyRelation  `json:"blocked_by"`
+	Blocking      []DependencyRelation  `json:"blocking"`
+	FetchedAt     time.Time            `json:"fetched_at"`
+	TotalCount    int                  `json:"total_count"`
 }
 
 // Repository Context Detection
@@ -267,4 +318,207 @@ func SetupGitHubClient() error {
 	}
 
 	return nil
+}
+
+// GitHub API Integration for Issue Dependencies
+//
+// These functions implement the GitHub API integration for fetching issue dependency
+// relationships using the go-gh/v2 library. They handle parallel API calls, error
+// handling, and data transformation.
+
+// fetchIssueDetails retrieves issue details from the GitHub API
+func fetchIssueDetails(ctx context.Context, client *api.RESTClient, owner, repo string, issueNumber int) (*Issue, error) {
+	// API endpoint for issue details
+	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d", owner, repo, issueNumber)
+	
+	var issue Issue
+	err := client.Get(endpoint, &issue)
+	if err != nil {
+		// Handle specific error types
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return nil, NewIssueNotFoundError(fmt.Sprintf("%s/%s", owner, repo), issueNumber)
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "forbidden") {
+			return nil, WrapPermissionError(fmt.Sprintf("%s/%s", owner, repo), err)
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "unauthorized") {
+			return nil, WrapAuthError(err)
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "rate limit") {
+			return nil, WrapAPIError(429, err)
+		}
+		
+		return nil, WrapInternalError("fetching issue details", err)
+	}
+	
+	// Add repository information for cross-repo support
+	issue.Repository = fmt.Sprintf("%s/%s", owner, repo)
+	
+	return &issue, nil
+}
+
+// fetchDependencyRelationships retrieves dependency relationships from GitHub API
+func fetchDependencyRelationships(ctx context.Context, client *api.RESTClient, owner, repo string, issueNumber int, relationType string) ([]DependencyRelation, error) {
+	// API endpoint for dependency relationships
+	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s", owner, repo, issueNumber, relationType)
+	
+	var relations []struct {
+		Issue Issue `json:"issue"`
+	}
+	
+	err := client.Get(endpoint, &relations)
+	if err != nil {
+		// Handle specific error types
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			// Issue doesn't exist or no dependencies - return empty slice
+			return []DependencyRelation{}, nil
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "forbidden") {
+			return nil, WrapPermissionError(fmt.Sprintf("%s/%s", owner, repo), err)
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "unauthorized") {
+			return nil, WrapAuthError(err)
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "rate limit") {
+			return nil, WrapAPIError(429, err)
+		}
+		
+		return nil, WrapInternalError(fmt.Sprintf("fetching %s dependencies", relationType), err)
+	}
+	
+	// Transform to DependencyRelation objects
+	var dependencies []DependencyRelation
+	for _, rel := range relations {
+		// Extract repository from issue HTML URL if available
+		repoName := fmt.Sprintf("%s/%s", owner, repo) // Default to current repo
+		if rel.Issue.HTMLURL != "" {
+			if repoFromURL := extractRepoFromURL(rel.Issue.HTMLURL); repoFromURL != "" {
+				repoName = repoFromURL
+			}
+		}
+		
+		dependencies = append(dependencies, DependencyRelation{
+			Issue:      rel.Issue,
+			Type:       relationType,
+			Repository: repoName,
+		})
+	}
+	
+	return dependencies, nil
+}
+
+// extractRepoFromURL extracts repository name from GitHub issue URL
+func extractRepoFromURL(url string) string {
+	// Extract repo from URL format: https://github.com/owner/repo/issues/123
+	if !strings.HasPrefix(url, "https://github.com/") {
+		return ""
+	}
+	
+	parts := strings.Split(strings.TrimPrefix(url, "https://github.com/"), "/")
+	if len(parts) < 2 {
+		return ""
+	}
+	
+	return parts[0] + "/" + parts[1]
+}
+
+// fetchDependencies retrieves all dependency data for an issue using parallel API calls
+func fetchDependencies(ctx context.Context, owner, repo string, issueNumber int) (*DependencyData, error) {
+	// Create GitHub API client
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return nil, WrapInternalError("creating GitHub API client", err)
+	}
+	
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	
+	// Channel for collecting results
+	type fetchResult struct {
+		sourceIssue *Issue
+		blockedBy   []DependencyRelation
+		blocking    []DependencyRelation
+		err         error
+	}
+	
+	resultChan := make(chan fetchResult, 3)
+	var wg sync.WaitGroup
+	
+	// Fetch source issue details
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		issue, err := fetchIssueDetails(ctx, client, owner, repo, issueNumber)
+		resultChan <- fetchResult{sourceIssue: issue, err: err}
+	}()
+	
+	// Fetch blocked_by relationships
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		relations, err := fetchDependencyRelationships(ctx, client, owner, repo, issueNumber, "blocked_by")
+		resultChan <- fetchResult{blockedBy: relations, err: err}
+	}()
+	
+	// Fetch blocking relationships  
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		relations, err := fetchDependencyRelationships(ctx, client, owner, repo, issueNumber, "blocking")
+		resultChan <- fetchResult{blocking: relations, err: err}
+	}()
+	
+	// Wait for all goroutines to complete
+	wg.Wait()
+	close(resultChan)
+	
+	// Collect results
+	var data DependencyData
+	data.FetchedAt = time.Now()
+	
+	for result := range resultChan {
+		if result.err != nil {
+			return nil, result.err
+		}
+		
+		if result.sourceIssue != nil {
+			data.SourceIssue = *result.sourceIssue
+		}
+		if result.blockedBy != nil {
+			data.BlockedBy = result.blockedBy
+		}
+		if result.blocking != nil {
+			data.Blocking = result.blocking
+		}
+	}
+	
+	// Calculate total count
+	data.TotalCount = len(data.BlockedBy) + len(data.Blocking)
+	
+	return &data, nil
+}
+
+// FetchIssueDependencies is the main exported function for retrieving dependency data
+func FetchIssueDependencies(ctx context.Context, owner, repo string, issueNumber int) (*DependencyData, error) {
+	// Validate inputs
+	if owner == "" || repo == "" {
+		return nil, NewEmptyValueError("repository owner or name")
+	}
+	if issueNumber <= 0 {
+		return nil, NewIssueNumberValidationError(strconv.Itoa(issueNumber))
+	}
+	
+	// Verify GitHub CLI authentication
+	if err := SetupGitHubClient(); err != nil {
+		return nil, err
+	}
+	
+	// Validate repository access
+	if err := ValidateRepoAccess(owner, repo); err != nil {
+		return nil, err
+	}
+	
+	// Fetch dependency data
+	return fetchDependencies(ctx, owner, repo, issueNumber)
 }
