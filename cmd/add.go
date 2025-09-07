@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/torynet/gh-issue-dependency/pkg"
 )
 
 // addCmd represents the add command
@@ -31,25 +33,61 @@ Dependencies can be within the same repository or cross-repository.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]
 
-		// Validate issue number format
-		if issueNumber == "" {
-			return fmt.Errorf("issue number cannot be empty")
+		// Parse and validate the main issue number
+		_, issueNum, err := pkg.ParseIssueReference(issueNumber)
+		if err != nil {
+			return err
 		}
 
 		// Validate that exactly one of --blocked-by or --blocks is specified
 		if addBlockedBy == "" && addBlocks == "" {
-			return fmt.Errorf("must specify either --blocked-by or --blocks")
+			return pkg.NewAppError(
+				pkg.ErrorTypeValidation,
+				"Must specify either --blocked-by or --blocks",
+				nil,
+			).WithSuggestion("Use --blocked-by to specify issues that block this one").
+				WithSuggestion("Use --blocks to specify issues that this one blocks")
 		}
 		
 		if addBlockedBy != "" && addBlocks != "" {
-			return fmt.Errorf("cannot specify both --blocked-by and --blocks")
+			return pkg.NewAppError(
+				pkg.ErrorTypeValidation,
+				"Cannot specify both --blocked-by and --blocks at the same time",
+				nil,
+			).WithSuggestion("Choose either --blocked-by or --blocks, not both")
+		}
+
+		// Parse dependency issue references
+		var dependencyRefs []string
+		if addBlockedBy != "" {
+			dependencyRefs = strings.Split(addBlockedBy, ",")
+		} else {
+			dependencyRefs = strings.Split(addBlocks, ",")
+		}
+
+		// Validate all dependency references
+		for _, ref := range dependencyRefs {
+			ref = strings.TrimSpace(ref)
+			if ref == "" {
+				continue
+			}
+			_, _, err := pkg.ParseIssueReference(ref)
+			if err != nil {
+				return err
+			}
 		}
 
 		// TODO: Implement add functionality
 		if addBlockedBy != "" {
-			return fmt.Errorf("add command not implemented yet: issue %s blocked by %s", issueNumber, addBlockedBy)
+			return pkg.WrapInternalError(
+				"adding blocked-by dependencies", 
+				fmt.Errorf("add command not implemented yet: issue %d blocked by %s", issueNum, addBlockedBy),
+			).WithSuggestion("This feature is currently under development")
 		} else {
-			return fmt.Errorf("add command not implemented yet: issue %s blocks %s", issueNumber, addBlocks)
+			return pkg.WrapInternalError(
+				"adding blocks dependencies",
+				fmt.Errorf("add command not implemented yet: issue %d blocks %s", issueNum, addBlocks),
+			).WithSuggestion("This feature is currently under development")
 		}
 	},
 }

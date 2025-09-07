@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/torynet/gh-issue-dependency/pkg"
 )
 
 var Version = "dev"
@@ -40,8 +41,20 @@ var repoFlag string
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() int {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return 1
+		// Use our structured error formatting for user-friendly messages
+		fmt.Fprintf(os.Stderr, "%s\n", pkg.FormatUserError(err))
+		
+		// Return appropriate exit codes based on error type
+		switch pkg.GetErrorType(err) {
+		case pkg.ErrorTypeAuthentication:
+			return 4 // Authentication required
+		case pkg.ErrorTypePermission:
+			return 3 // Permission denied
+		case pkg.ErrorTypeValidation:
+			return 2 // Invalid input
+		default:
+			return 1 // General error
+		}
 	}
 	return 0
 }

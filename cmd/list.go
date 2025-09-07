@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/torynet/gh-issue-dependency/pkg"
 )
 
 // listCmd represents the list command
@@ -30,13 +31,35 @@ The output includes issue numbers, titles, and current status.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]
 		
-		// Validate issue number format
-		if issueNumber == "" {
-			return fmt.Errorf("issue number cannot be empty")
+		// Parse and validate the issue number
+		_, issueNum, err := pkg.ParseIssueReference(issueNumber)
+		if err != nil {
+			return err
+		}
+
+		// Validate format option
+		validFormats := []string{"table", "json", "csv"}
+		isValidFormat := false
+		for _, format := range validFormats {
+			if listFormat == format {
+				isValidFormat = true
+				break
+			}
+		}
+		if !isValidFormat {
+			return pkg.NewAppError(
+				pkg.ErrorTypeValidation,
+				fmt.Sprintf("Invalid format: %s", listFormat),
+				nil,
+			).WithContext("format", listFormat).
+				WithSuggestion("Use one of: table, json, csv")
 		}
 
 		// TODO: Implement list functionality
-		return fmt.Errorf("list command not implemented yet for issue %s", issueNumber)
+		return pkg.WrapInternalError(
+			"listing dependencies",
+			fmt.Errorf("list command not implemented yet for issue %d", issueNum),
+		).WithSuggestion("This feature is currently under development")
 	},
 }
 

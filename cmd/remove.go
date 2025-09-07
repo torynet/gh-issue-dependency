@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/torynet/gh-issue-dependency/pkg"
 )
 
 // removeCmd represents the remove command
@@ -31,25 +33,61 @@ Works for both same-repository and cross-repository dependencies.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]
 
-		// Validate issue number format
-		if issueNumber == "" {
-			return fmt.Errorf("issue number cannot be empty")
+		// Parse and validate the main issue number
+		_, issueNum, err := pkg.ParseIssueReference(issueNumber)
+		if err != nil {
+			return err
 		}
 
 		// Validate that exactly one of --blocked-by or --blocks is specified
 		if removeBlockedBy == "" && removeBlocks == "" {
-			return fmt.Errorf("must specify either --blocked-by or --blocks")
+			return pkg.NewAppError(
+				pkg.ErrorTypeValidation,
+				"Must specify either --blocked-by or --blocks",
+				nil,
+			).WithSuggestion("Use --blocked-by to remove issues that block this one").
+				WithSuggestion("Use --blocks to remove issues that this one blocks")
 		}
 		
 		if removeBlockedBy != "" && removeBlocks != "" {
-			return fmt.Errorf("cannot specify both --blocked-by and --blocks")
+			return pkg.NewAppError(
+				pkg.ErrorTypeValidation,
+				"Cannot specify both --blocked-by and --blocks at the same time",
+				nil,
+			).WithSuggestion("Choose either --blocked-by or --blocks, not both")
+		}
+
+		// Parse dependency issue references
+		var dependencyRefs []string
+		if removeBlockedBy != "" {
+			dependencyRefs = strings.Split(removeBlockedBy, ",")
+		} else {
+			dependencyRefs = strings.Split(removeBlocks, ",")
+		}
+
+		// Validate all dependency references
+		for _, ref := range dependencyRefs {
+			ref = strings.TrimSpace(ref)
+			if ref == "" {
+				continue
+			}
+			_, _, err := pkg.ParseIssueReference(ref)
+			if err != nil {
+				return err
+			}
 		}
 
 		// TODO: Implement remove functionality
 		if removeBlockedBy != "" {
-			return fmt.Errorf("remove command not implemented yet: removing issue %s blocked by %s", issueNumber, removeBlockedBy)
+			return pkg.WrapInternalError(
+				"removing blocked-by dependencies",
+				fmt.Errorf("remove command not implemented yet: removing issue %d blocked by %s", issueNum, removeBlockedBy),
+			).WithSuggestion("This feature is currently under development")
 		} else {
-			return fmt.Errorf("remove command not implemented yet: removing issue %s blocks %s", issueNumber, removeBlocks)
+			return pkg.WrapInternalError(
+				"removing blocks dependencies",
+				fmt.Errorf("remove command not implemented yet: removing issue %d blocks %s", issueNum, removeBlocks),
+			).WithSuggestion("This feature is currently under development")
 		}
 	},
 }
