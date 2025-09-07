@@ -4,19 +4,16 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewAppError(t *testing.T) {
 	err := NewAppError(ErrorTypeValidation, "test message", errors.New("cause"))
-	if err.Type != ErrorTypeValidation {
-		t.Errorf("Expected ErrorTypeValidation, got %v", err.Type)
-	}
-	if err.Message != "test message" {
-		t.Errorf("Expected 'test message', got %v", err.Message)
-	}
-	if err.Error() != "test message" {
-		t.Errorf("Expected 'test message' from Error(), got %v", err.Error())
-	}
+	assert.Equal(t, ErrorTypeValidation, err.Type, "should have correct error type")
+	assert.Equal(t, "test message", err.Message, "should have correct message")
+	assert.Equal(t, "test message", err.Error(), "Error() should return message")
+	assert.NotNil(t, err.Cause, "should have cause")
 }
 
 func TestAppErrorWithContext(t *testing.T) {
