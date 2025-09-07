@@ -31,6 +31,12 @@ The output includes issue numbers, titles, and current status.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]
 		
+		// Resolve repository context using the new github detection
+		owner, repo, err := pkg.ResolveRepository(repoFlag, issueNumber)
+		if err != nil {
+			return err
+		}
+		
 		// Parse and validate the issue number
 		_, issueNum, err := pkg.ParseIssueReference(issueNumber)
 		if err != nil {
@@ -58,8 +64,10 @@ The output includes issue numbers, titles, and current status.`,
 		// TODO: Implement list functionality
 		return pkg.WrapInternalError(
 			"listing dependencies",
-			fmt.Errorf("list command not implemented yet for issue %d", issueNum),
-		).WithSuggestion("This feature is currently under development")
+			fmt.Errorf("list command not implemented yet for issue #%d in %s/%s", issueNum, owner, repo),
+		).WithSuggestion("This feature is currently under development").
+			WithContext("repository", fmt.Sprintf("%s/%s", owner, repo)).
+			WithContext("issue", fmt.Sprintf("#%d", issueNum))
 	},
 }
 
