@@ -5,12 +5,20 @@
 package pkg
 
 import (
+	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/cli/go-gh/v2/pkg/api"
 )
 
 // RepoInfo represents repository information returned from GitHub API calls.
@@ -19,6 +27,66 @@ type RepoInfo struct {
 	Owner string `json:"owner"` // Repository owner (user or organization)
 	Name  string `json:"name"`  // Repository name
 }
+
+// GitHub API Data Structures for Issue Dependencies
+//
+// These structures model the GitHub API responses for issue dependency relationships
+// and issue details. They are used for marshaling API responses and providing
+// structured data to the output formatting system.
+
+// User represents a GitHub user or organization
+type User struct {
+	Login   string `json:"login"`
+	HTMLURL string `json:"html_url"`
+}
+
+// Label represents a GitHub issue label
+type Label struct {
+	Name        string `json:"name"`
+	Color       string `json:"color"`
+	Description string `json:"description"`
+}
+
+// Issue represents a GitHub issue with dependency-relevant fields
+type Issue struct {
+	Number    int      `json:"number"`
+	Title     string   `json:"title"`
+	State     string   `json:"state"`
+	Assignees []User   `json:"assignees"`
+	Labels    []Label  `json:"labels"`
+	HTMLURL   string   `json:"html_url"`
+	Repository string  `json:"repository,omitempty"` // Added for cross-repo dependencies
+}
+
+// DependencyRelation represents a relationship between issues
+type DependencyRelation struct {
+	Issue      Issue  `json:"issue"`
+	Type       string `json:"type"`       // "blocked_by" or "blocks"
+	Repository string `json:"repository"` // Repository of the related issue
+}
+
+// DependencyData contains all dependency information for an issue
+type DependencyData struct {
+	SourceIssue             Issue                 `json:"source_issue"`
+	BlockedBy               []DependencyRelation  `json:"blocked_by"`
+	Blocking                []DependencyRelation  `json:"blocking"`
+	FetchedAt               time.Time            `json:"fetched_at"`
+	TotalCount              int                  `json:"total_count"`
+	OriginalBlockedByCount  int                  `json:"original_blocked_by_count,omitempty"`
+	OriginalBlockingCount   int                  `json:"original_blocking_count,omitempty"`
+}
+
+// CacheEntry represents a cached dependency data entry
+type CacheEntry struct {
+	Data      DependencyData `json:"data"`
+	ExpiresAt time.Time      `json:"expires_at"`
+}
+
+// Cache configuration
+const (
+	CacheDir     = ".gh-issue-dependency-cache"
+	CacheDuration = 5 * time.Minute // Cache for 5 minutes
+)
 
 // Repository Context Detection
 //
@@ -266,5 +334,342 @@ func SetupGitHubClient() error {
 			WithSuggestion("Run 'gh auth login' to authenticate with GitHub")
 	}
 
+	return nil
+}
+
+// GitHub API Integration for Issue Dependencies
+//
+// These functions implement the GitHub API integration for fetching issue dependency
+// relationships using the go-gh/v2 library. They handle parallel API calls, error
+// handling, and data transformation.
+
+// fetchIssueDetails retrieves issue details from the GitHub API
+func fetchIssueDetails(ctx context.Context, client *api.RESTClient, owner, repo string, issueNumber int) (*Issue, error) {
+	// API endpoint for issue details
+	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d", owner, repo, issueNumber)
+	
+	var issue Issue
+	err := client.Get(endpoint, &issue)
+	if err != nil {
+		// Handle specific error types
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return nil, NewIssueNotFoundError(fmt.Sprintf("%s/%s", owner, repo), issueNumber)
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "forbidden") {
+			return nil, WrapPermissionError(fmt.Sprintf("%s/%s", owner, repo), err)
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "unauthorized") {
+			return nil, WrapAuthError(err)
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "rate limit") {
+			return nil, WrapAPIError(429, err)
+		}
+		
+		return nil, WrapInternalError("fetching issue details", err)
+	}
+	
+	// Add repository information for cross-repo support
+	issue.Repository = fmt.Sprintf("%s/%s", owner, repo)
+	
+	return &issue, nil
+}
+
+// fetchDependencyRelationships retrieves dependency relationships from GitHub API
+func fetchDependencyRelationships(ctx context.Context, client *api.RESTClient, owner, repo string, issueNumber int, relationType string) ([]DependencyRelation, error) {
+	// API endpoint for dependency relationships
+	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s", owner, repo, issueNumber, relationType)
+	
+	var relations []struct {
+		Issue Issue `json:"issue"`
+	}
+	
+	err := client.Get(endpoint, &relations)
+	if err != nil {
+		// Handle specific error types
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			// Issue doesn't exist or no dependencies - return empty slice
+			return []DependencyRelation{}, nil
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "forbidden") {
+			return nil, WrapPermissionError(fmt.Sprintf("%s/%s", owner, repo), err)
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "unauthorized") {
+			return nil, WrapAuthError(err)
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "rate limit") {
+			return nil, WrapAPIError(429, err)
+		}
+		
+		return nil, WrapInternalError(fmt.Sprintf("fetching %s dependencies", relationType), err)
+	}
+	
+	// Transform to DependencyRelation objects
+	var dependencies []DependencyRelation
+	for _, rel := range relations {
+		// Extract repository from issue HTML URL if available
+		repoName := fmt.Sprintf("%s/%s", owner, repo) // Default to current repo
+		if rel.Issue.HTMLURL != "" {
+			if repoFromURL := extractRepoFromURL(rel.Issue.HTMLURL); repoFromURL != "" {
+				repoName = repoFromURL
+			}
+		}
+		
+		dependencies = append(dependencies, DependencyRelation{
+			Issue:      rel.Issue,
+			Type:       relationType,
+			Repository: repoName,
+		})
+	}
+	
+	return dependencies, nil
+}
+
+// extractRepoFromURL extracts repository name from GitHub issue URL
+func extractRepoFromURL(url string) string {
+	// Extract repo from URL format: https://github.com/owner/repo/issues/123
+	if !strings.HasPrefix(url, "https://github.com/") {
+		return ""
+	}
+	
+	parts := strings.Split(strings.TrimPrefix(url, "https://github.com/"), "/")
+	if len(parts) < 2 {
+		return ""
+	}
+	
+	return parts[0] + "/" + parts[1]
+}
+
+// fetchDependencies retrieves all dependency data for an issue using parallel API calls
+func fetchDependencies(ctx context.Context, owner, repo string, issueNumber int) (*DependencyData, error) {
+	// Create GitHub API client
+	client, err := api.DefaultRESTClient()
+	if err != nil {
+		return nil, WrapInternalError("creating GitHub API client", err)
+	}
+	
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	
+	// Channel for collecting results
+	type fetchResult struct {
+		sourceIssue *Issue
+		blockedBy   []DependencyRelation
+		blocking    []DependencyRelation
+		err         error
+	}
+	
+	resultChan := make(chan fetchResult, 3)
+	var wg sync.WaitGroup
+	
+	// Fetch source issue details
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		issue, err := fetchIssueDetails(ctx, client, owner, repo, issueNumber)
+		resultChan <- fetchResult{sourceIssue: issue, err: err}
+	}()
+	
+	// Fetch blocked_by relationships
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		relations, err := fetchDependencyRelationships(ctx, client, owner, repo, issueNumber, "blocked_by")
+		resultChan <- fetchResult{blockedBy: relations, err: err}
+	}()
+	
+	// Fetch blocking relationships  
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		relations, err := fetchDependencyRelationships(ctx, client, owner, repo, issueNumber, "blocking")
+		resultChan <- fetchResult{blocking: relations, err: err}
+	}()
+	
+	// Wait for all goroutines to complete
+	wg.Wait()
+	close(resultChan)
+	
+	// Collect results
+	var data DependencyData
+	data.FetchedAt = time.Now()
+	
+	for result := range resultChan {
+		if result.err != nil {
+			return nil, result.err
+		}
+		
+		if result.sourceIssue != nil {
+			data.SourceIssue = *result.sourceIssue
+		}
+		if result.blockedBy != nil {
+			data.BlockedBy = result.blockedBy
+		}
+		if result.blocking != nil {
+			data.Blocking = result.blocking
+		}
+	}
+	
+	// Calculate total count
+	data.TotalCount = len(data.BlockedBy) + len(data.Blocking)
+	
+	return &data, nil
+}
+
+// FetchIssueDependencies is the main exported function for retrieving dependency data
+func FetchIssueDependencies(ctx context.Context, owner, repo string, issueNumber int) (*DependencyData, error) {
+	// Validate inputs
+	if owner == "" || repo == "" {
+		return nil, NewEmptyValueError("repository owner or name")
+	}
+	if issueNumber <= 0 {
+		return nil, NewIssueNumberValidationError(strconv.Itoa(issueNumber))
+	}
+	
+	// Try to get from cache first
+	cacheKey := getCacheKey(owner, repo, issueNumber)
+	if data, found := getFromCache(cacheKey); found {
+		return data, nil
+	}
+	
+	// Verify GitHub CLI authentication
+	if err := SetupGitHubClient(); err != nil {
+		return nil, err
+	}
+	
+	// Validate repository access
+	if err := ValidateRepoAccess(owner, repo); err != nil {
+		return nil, err
+	}
+	
+	// Fetch dependency data
+	data, err := fetchDependencies(ctx, owner, repo, issueNumber)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Cache the result
+	saveToCache(cacheKey, data)
+	
+	return data, nil
+}
+
+// getCacheKey generates a unique cache key for the request
+func getCacheKey(owner, repo string, issueNumber int) string {
+	key := fmt.Sprintf("%s/%s#%d", owner, repo, issueNumber)
+	hash := md5.Sum([]byte(key))
+	return fmt.Sprintf("%x", hash)
+}
+
+// getCacheDir returns the cache directory path
+func getCacheDir() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return CacheDir // fallback to relative path
+	}
+	return filepath.Join(homeDir, CacheDir)
+}
+
+// getFromCache attempts to retrieve data from cache
+func getFromCache(key string) (*DependencyData, bool) {
+	cacheDir := getCacheDir()
+	cachePath := filepath.Join(cacheDir, key+".json")
+	
+	// Check if cache file exists
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		return nil, false
+	}
+	
+	// Read cache file
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		return nil, false
+	}
+	
+	// Parse cache entry
+	var entry CacheEntry
+	if err := json.Unmarshal(data, &entry); err != nil {
+		return nil, false
+	}
+	
+	// Check if cache entry has expired
+	if time.Now().After(entry.ExpiresAt) {
+		// Remove expired cache file
+		os.Remove(cachePath)
+		return nil, false
+	}
+	
+	return &entry.Data, true
+}
+
+// saveToCache stores data in cache
+func saveToCache(key string, data *DependencyData) {
+	cacheDir := getCacheDir()
+	
+	// Create cache directory if it doesn't exist
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return // fail silently
+	}
+	
+	// Create cache entry
+	entry := CacheEntry{
+		Data:      *data,
+		ExpiresAt: time.Now().Add(CacheDuration),
+	}
+	
+	// Marshal to JSON
+	jsonData, err := json.Marshal(entry)
+	if err != nil {
+		return // fail silently
+	}
+	
+	// Write to cache file
+	cachePath := filepath.Join(cacheDir, key+".json")
+	os.WriteFile(cachePath, jsonData, 0644)
+}
+
+// CleanExpiredCache removes expired cache entries
+func CleanExpiredCache() error {
+	cacheDir := getCacheDir()
+	
+	// Check if cache directory exists
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		return nil // no cache to clean
+	}
+	
+	// Read cache directory
+	files, err := os.ReadDir(cacheDir)
+	if err != nil {
+		return err
+	}
+	
+	now := time.Now()
+	for _, file := range files {
+		if !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+		
+		cachePath := filepath.Join(cacheDir, file.Name())
+		
+		// Read cache file
+		data, err := os.ReadFile(cachePath)
+		if err != nil {
+			continue
+		}
+		
+		// Parse cache entry
+		var entry CacheEntry
+		if err := json.Unmarshal(data, &entry); err != nil {
+			// Remove malformed cache files
+			os.Remove(cachePath)
+			continue
+		}
+		
+		// Remove expired entries
+		if now.After(entry.ExpiresAt) {
+			os.Remove(cachePath)
+		}
+	}
+	
 	return nil
 }
