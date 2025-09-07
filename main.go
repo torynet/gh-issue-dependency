@@ -1,11 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"os"
+
+	"github.com/torynet/gh-issue-dependency/cmd"
 )
 
 func main() {
-	fmt.Println("gh-issue-dependency CLI - Coming Soon!")
-	os.Exit(0)
+	code := cmd.Execute()
+	os.Exit(code)
 }
