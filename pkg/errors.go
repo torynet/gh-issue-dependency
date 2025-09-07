@@ -8,7 +8,14 @@ import (
 	"strings"
 )
 
-// ErrorType represents the category of error for proper handling
+// Error Handling and User-Friendly Error Messages
+//
+// This file provides structured error handling with contextual information
+// and user-friendly error messages. It categorizes errors by type and provides
+// specific suggestions for resolution.
+
+// ErrorType represents the category of error for proper handling.
+// This allows the CLI to determine appropriate exit codes and error formatting.
 type ErrorType string
 
 const (
@@ -22,13 +29,15 @@ const (
 	ErrorTypeInternal       ErrorType = "internal"
 )
 
-// AppError represents a structured error with context and user guidance
+// AppError represents a structured error with context and user guidance.
+// This is the primary error type used throughout the application to provide
+// consistent, user-friendly error messages with actionable suggestions.
 type AppError struct {
-	Type        ErrorType
-	Message     string
-	Cause       error
-	Context     map[string]string
-	Suggestions []string
+	Type        ErrorType         // Category of error for exit code determination
+	Message     string            // User-facing error message
+	Cause       error             // Underlying error that caused this error
+	Context     map[string]string // Additional context information (repository, issue, etc.)
+	Suggestions []string          // Actionable suggestions for resolving the error
 }
 
 func (e *AppError) Error() string {

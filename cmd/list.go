@@ -47,19 +47,23 @@ FLAGS
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]
 		
-		// Resolve repository context using the new github detection
+		// Resolve repository context using GitHub repository detection.
+		// This handles both explicit --repo flags and automatic detection
+		// from the current working directory's git remote.
 		owner, repo, err := pkg.ResolveRepository(repoFlag, issueNumber)
 		if err != nil {
 			return err
 		}
 		
-		// Parse and validate the issue number
+		// Parse and validate the issue number from the user input.
+		// This supports both simple numbers (123) and full references (owner/repo#123).
 		_, issueNum, err := pkg.ParseIssueReference(issueNumber)
 		if err != nil {
 			return err
 		}
 
-		// Validate format option
+		// Validate the output format option against supported formats.
+		// We support table (default), JSON, and CSV formats for different use cases.
 		validFormats := []string{"table", "json", "csv"}
 		isValidFormat := false
 		for _, format := range validFormats {
@@ -78,6 +82,8 @@ FLAGS
 		}
 
 		// TODO: Implement list functionality
+		// This will fetch dependency data from GitHub's API and format it
+		// according to the specified output format.
 		return pkg.WrapInternalError(
 			"listing dependencies",
 			fmt.Errorf("list command not implemented yet for issue #%d in %s/%s", issueNum, owner, repo),
@@ -89,14 +95,20 @@ FLAGS
 
 // Flags for list command
 var (
+	// listDetailed controls whether to show detailed dependency information
+	// including creation dates, users who created relationships, etc.
 	listDetailed bool
-	listFormat   string
+	
+	// listFormat specifies the output format for dependency information.
+	// Supported formats: table (default), json, csv
+	listFormat string
 )
 
+// init registers the list command with the root command and sets up its flags.
 func init() {
 	rootCmd.AddCommand(listCmd)
 
-	// Local flags for list command
-	listCmd.Flags().BoolVar(&listDetailed, "detailed", false, "Show detailed dependency information")
-	listCmd.Flags().StringVar(&listFormat, "format", "table", "Output format (table, json, csv)")
+	// Local flags specific to the list command
+	listCmd.Flags().BoolVar(&listDetailed, "detailed", false, "Show detailed dependency information including dates and users")
+	listCmd.Flags().StringVar(&listFormat, "format", "table", "Output format: table (default), json, csv")
 }

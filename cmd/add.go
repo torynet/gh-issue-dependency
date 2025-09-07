@@ -117,14 +117,21 @@ FLAGS
 
 // Flags for add command
 var (
+	// addBlockedBy contains a comma-separated list of issue references that block
+	// the target issue. These issues must be completed before the target can be worked on.
 	addBlockedBy string
-	addBlocks    string
+	
+	// addBlocks contains a comma-separated list of issue references that are blocked
+	// by the target issue. The target must be completed before these can be worked on.
+	addBlocks string
 )
 
+// init registers the add command with the root command and sets up its flags.
 func init() {
 	rootCmd.AddCommand(addCmd)
 
-	// Local flags for add command
+	// Local flags specific to the add command
+	// Note: These flags are mutually exclusive - validation happens in the command logic
 	addCmd.Flags().StringVar(&addBlockedBy, "blocked-by", "", "Issue number(s) that block this issue (comma-separated)")
 	addCmd.Flags().StringVar(&addBlocks, "blocks", "", "Issue number(s) that this issue blocks (comma-separated)")
 }

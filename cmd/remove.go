@@ -121,14 +121,21 @@ FLAGS
 
 // Flags for remove command
 var (
+	// removeBlockedBy contains a comma-separated list of issue references to remove
+	// from blocking the target issue. This will remove the "blocked by" relationship.
 	removeBlockedBy string
-	removeBlocks    string
+	
+	// removeBlocks contains a comma-separated list of issue references to remove
+	// from being blocked by the target issue. This will remove the "blocks" relationship.
+	removeBlocks string
 )
 
+// init registers the remove command with the root command and sets up its flags.
 func init() {
 	rootCmd.AddCommand(removeCmd)
 
-	// Local flags for remove command
+	// Local flags specific to the remove command
+	// Note: These flags are mutually exclusive - validation happens in the command logic
 	removeCmd.Flags().StringVar(&removeBlockedBy, "blocked-by", "", "Issue number(s) to remove from blocking this issue (comma-separated)")
 	removeCmd.Flags().StringVar(&removeBlocks, "blocks", "", "Issue number(s) to remove from being blocked by this issue (comma-separated)")
 }

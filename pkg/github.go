@@ -1,3 +1,7 @@
+// Package pkg provides shared utilities and types for the gh-issue-dependency extension.
+//
+// This package contains GitHub API integration, error handling, repository context
+// detection, and other common functionality used across all commands.
 package pkg
 
 import (
@@ -9,16 +13,25 @@ import (
 	"strings"
 )
 
-// RepoInfo represents repository information
+// RepoInfo represents repository information returned from GitHub API calls.
+// This structure is used for JSON unmarshaling of repository data.
 type RepoInfo struct {
-	Owner string `json:"owner"`
-	Name  string `json:"name"`
+	Owner string `json:"owner"` // Repository owner (user or organization)
+	Name  string `json:"name"`  // Repository name
 }
 
-// GitHub API client setup and repository context detection
-// Following gh-sub-issue patterns for repository handling
+// Repository Context Detection
+//
+// These functions handle repository context detection following gh-sub-issue patterns.
+// They provide a consistent way to determine which repository to work with based on
+// user input, current directory, and command-line flags.
 
-// GetCurrentRepo gets the current repository using gh repo view --json
+// GetCurrentRepo gets the current repository context using the GitHub CLI.
+// It uses 'gh repo view' to determine the repository based on the current working directory.
+// This function requires that the user is in a directory associated with a GitHub repository
+// and that they have authenticated with the GitHub CLI.
+//
+// Returns the repository owner and name, or an error if the repository cannot be determined.
 func GetCurrentRepo() (owner, repo string, err error) {
 	// Use gh CLI to get current repository context
 	cmd := exec.Command("gh", "repo", "view", "--json", "owner,name")
