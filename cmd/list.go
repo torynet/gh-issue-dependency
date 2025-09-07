@@ -147,17 +147,19 @@ func fetchAndDisplayDependencies(owner, repo string, issueNum int, format, state
 	defer cancel()
 	
 	// Fetch dependency data from GitHub API
-	data, err := pkg.FetchIssueDependencies(ctx, owner, repo, issueNum)
+	originalData, err := pkg.FetchIssueDependencies(ctx, owner, repo, issueNum)
 	if err != nil {
 		return err
 	}
 	
-	// Apply state filtering
-	data = applyStateFilter(data, state)
+	// Apply state filtering, keeping reference to original data
+	filteredData := applyStateFilter(originalData, state)
 	
 	// Determine output format and create formatter
 	outputOptions := pkg.DefaultOutputOptions()
 	outputOptions.Detailed = detailed
+	outputOptions.StateFilter = state
+	outputOptions.OriginalData = originalData
 	
 	// Handle JSON field selection
 	if listJSON != "" {
@@ -182,7 +184,7 @@ func fetchAndDisplayDependencies(owner, repo string, issueNum int, format, state
 	
 	// Create formatter and display results
 	formatter := pkg.NewOutputFormatter(outputOptions)
-	return formatter.FormatOutput(data)
+	return formatter.FormatOutput(filteredData)
 }
 
 // parseJSONFields parses the JSON fields specification

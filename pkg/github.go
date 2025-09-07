@@ -64,11 +64,13 @@ type DependencyRelation struct {
 
 // DependencyData contains all dependency information for an issue
 type DependencyData struct {
-	SourceIssue   Issue                 `json:"source_issue"`
-	BlockedBy     []DependencyRelation  `json:"blocked_by"`
-	Blocking      []DependencyRelation  `json:"blocking"`
-	FetchedAt     time.Time            `json:"fetched_at"`
-	TotalCount    int                  `json:"total_count"`
+	SourceIssue             Issue                 `json:"source_issue"`
+	BlockedBy               []DependencyRelation  `json:"blocked_by"`
+	Blocking                []DependencyRelation  `json:"blocking"`
+	FetchedAt               time.Time            `json:"fetched_at"`
+	TotalCount              int                  `json:"total_count"`
+	OriginalBlockedByCount  int                  `json:"original_blocked_by_count,omitempty"`
+	OriginalBlockingCount   int                  `json:"original_blocking_count,omitempty"`
 }
 
 // Repository Context Detection

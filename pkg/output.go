@@ -26,19 +26,23 @@ const (
 
 // OutputOptions contains configuration for output formatting
 type OutputOptions struct {
-	Format     OutputFormat
-	JSONFields []string // Specific fields to include in JSON output
-	Detailed   bool     // Include detailed information
-	Writer     io.Writer
+	Format       OutputFormat
+	JSONFields   []string // Specific fields to include in JSON output
+	Detailed     bool     // Include detailed information
+	Writer       io.Writer
+	StateFilter  string   // Applied state filter for context-aware messaging
+	OriginalData *DependencyData // Original data before filtering for comparison
 }
 
 // DefaultOutputOptions returns sensible defaults for output options
 func DefaultOutputOptions() *OutputOptions {
 	return &OutputOptions{
-		Format:     FormatAuto,
-		JSONFields: []string{},
-		Detailed:   false,
-		Writer:     os.Stdout,
+		Format:       FormatAuto,
+		JSONFields:   []string{},
+		Detailed:     false,
+		Writer:       os.Stdout,
+		StateFilter:  "all",
+		OriginalData: nil,
 	}
 }
 
@@ -81,6 +85,9 @@ func (f *OutputFormatter) determineFormat() OutputFormat {
 // FormatOutput formats dependency data according to the configured output format
 func (f *OutputFormatter) FormatOutput(data *DependencyData) error {
 	format := f.determineFormat()
+
+	// Add filter context if applicable
+	f.addFilterContext(data)
 
 	switch format {
 	case FormatTTY:
@@ -144,8 +151,14 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 
 			// Show repository context for cross-repo dependencies
 			if dep.Repository != data.SourceIssue.Repository {
-				fmt.Fprintf(f.options.Writer, " %s(%s)%s",
+				fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
 					muted(""), dep.Repository, termenv.CSI+termenv.ResetSeq)
+			}
+
+			// Show URL for easy navigation
+			if dep.Issue.HTMLURL != "" {
+				fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
+					muted(""), dep.Issue.HTMLURL, termenv.CSI+termenv.ResetSeq)
 			}
 
 			fmt.Fprintf(f.options.Writer, "\n")
@@ -180,8 +193,14 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 
 			// Show repository context for cross-repo dependencies
 			if dep.Repository != data.SourceIssue.Repository {
-				fmt.Fprintf(f.options.Writer, " %s(%s)%s",
+				fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
 					muted(""), dep.Repository, termenv.CSI+termenv.ResetSeq)
+			}
+
+			// Show URL for easy navigation
+			if dep.Issue.HTMLURL != "" {
+				fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
+					muted(""), dep.Issue.HTMLURL, termenv.CSI+termenv.ResetSeq)
 			}
 
 			fmt.Fprintf(f.options.Writer, "\n")
@@ -191,10 +210,11 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 
 	// Empty state handling
 	if data.TotalCount == 0 {
-		fmt.Fprintf(f.options.Writer, "%s💡 No dependencies found for this issue.%s\n\n",
-			info(""), termenv.CSI+termenv.ResetSeq)
-		fmt.Fprintf(f.options.Writer, "%sTip: Use 'gh issue-dependency add' to create dependency relationships.%s\n",
-			muted(""), termenv.CSI+termenv.ResetSeq)
+		mainMsg, tipMsg := f.getEmptyStateMessage(data)
+		fmt.Fprintf(f.options.Writer, "%s💡 %s%s\n\n",
+			info(""), mainMsg, termenv.CSI+termenv.ResetSeq)
+		fmt.Fprintf(f.options.Writer, "%s%s%s\n",
+			muted(""), tipMsg, termenv.CSI+termenv.ResetSeq)
 	}
 
 	// Footer with metadata
@@ -237,7 +257,12 @@ func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 
 			// Show repository context for cross-repo dependencies
 			if dep.Repository != data.SourceIssue.Repository {
-				fmt.Fprintf(f.options.Writer, " (%s)", dep.Repository)
+				fmt.Fprintf(f.options.Writer, "\n       Repository: %s", dep.Repository)
+			}
+
+			// Show URL for easy navigation
+			if dep.Issue.HTMLURL != "" {
+				fmt.Fprintf(f.options.Writer, "\n       URL: %s", dep.Issue.HTMLURL)
 			}
 
 			fmt.Fprintf(f.options.Writer, "\n")
@@ -265,7 +290,12 @@ func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 
 			// Show repository context for cross-repo dependencies
 			if dep.Repository != data.SourceIssue.Repository {
-				fmt.Fprintf(f.options.Writer, " (%s)", dep.Repository)
+				fmt.Fprintf(f.options.Writer, "\n       Repository: %s", dep.Repository)
+			}
+
+			// Show URL for easy navigation
+			if dep.Issue.HTMLURL != "" {
+				fmt.Fprintf(f.options.Writer, "\n       URL: %s", dep.Issue.HTMLURL)
 			}
 
 			fmt.Fprintf(f.options.Writer, "\n")
@@ -275,8 +305,9 @@ func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 
 	// Empty state handling
 	if data.TotalCount == 0 {
-		fmt.Fprintf(f.options.Writer, "No dependencies found for this issue.\n\n")
-		fmt.Fprintf(f.options.Writer, "Tip: Use 'gh issue-dependency add' to create dependency relationships.\n")
+		mainMsg, tipMsg := f.getEmptyStateMessage(data)
+		fmt.Fprintf(f.options.Writer, "%s\n\n", mainMsg)
+		fmt.Fprintf(f.options.Writer, "%s\n", tipMsg)
 	}
 
 	// Footer with metadata
@@ -565,5 +596,62 @@ func formatLabelsForJSON(labels []Label) []map[string]interface{} {
 	}
 
 	return result
+}
+
+// addFilterContext adds filter context information to help with empty state messaging
+func (f *OutputFormatter) addFilterContext(data *DependencyData) {
+	// Store original data counts if we have it for comparison
+	if f.options.OriginalData != nil {
+		data.OriginalBlockedByCount = len(f.options.OriginalData.BlockedBy)
+		data.OriginalBlockingCount = len(f.options.OriginalData.Blocking)
+	}
+}
+
+// getEmptyStateMessage returns context-aware empty state message
+func (f *OutputFormatter) getEmptyStateMessage(data *DependencyData) (string, string) {
+	var mainMsg, tipMsg string
+	
+	// Check if we have original data to compare against
+	hasOriginalData := f.options.OriginalData != nil && 
+		(f.options.OriginalData.TotalCount > data.TotalCount)
+	
+	switch f.options.StateFilter {
+	case "open":
+		if hasOriginalData {
+			closedCount := f.options.OriginalData.TotalCount - data.TotalCount
+			mainMsg = fmt.Sprintf("No open dependencies found for issue #%d.", data.SourceIssue.Number)
+			if closedCount > 0 {
+				tipMsg = fmt.Sprintf("Note: %d closed dependencies found. Use --state all to see all dependencies.", closedCount)
+			} else {
+				tipMsg = "No dependencies exist for this issue. Use 'gh issue-dependency add' to create relationships."
+			}
+		} else {
+			mainMsg = fmt.Sprintf("No open dependencies found for issue #%d.", data.SourceIssue.Number)
+			tipMsg = "Use --state all to see closed dependencies, or --state closed for closed only."
+		}
+		
+	case "closed":
+		if hasOriginalData {
+			openCount := f.options.OriginalData.TotalCount - data.TotalCount
+			mainMsg = fmt.Sprintf("No closed dependencies found for issue #%d.", data.SourceIssue.Number)
+			if openCount > 0 {
+				tipMsg = fmt.Sprintf("Note: %d open dependencies found. Use --state all to see all dependencies.", openCount)
+			} else {
+				tipMsg = "No dependencies exist for this issue. Use 'gh issue-dependency add' to create relationships."
+			}
+		} else {
+			mainMsg = fmt.Sprintf("No closed dependencies found for issue #%d.", data.SourceIssue.Number)
+			tipMsg = "Use --state all to see open dependencies, or --state open for open only."
+		}
+		
+	default: // "all"
+		mainMsg = fmt.Sprintf("No dependencies found for issue #%d.", data.SourceIssue.Number)
+		tipMsg = "Use 'gh issue-dependency add' to create dependency relationships."
+		if data.SourceIssue.Repository != "" {
+			tipMsg += "\nNote: Some dependencies may exist in repositories you don't have access to."
+		}
+	}
+	
+	return mainMsg, tipMsg
 }
 
