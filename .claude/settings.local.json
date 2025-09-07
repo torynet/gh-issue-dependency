@@ -59,7 +59,11 @@
       "Bash(.gh-issue-dependency.exe:*)",
       "Bash(./gh-issue-dependency.exe list --help)",
       "Bash(./gh-issue-dependency.exe add --help)",
-      "Bash(./gh-issue-dependency.exe remove --help)"
+      "Bash(./gh-issue-dependency.exe remove --help)",
+      "Bash(./gh-issue-dependency.exe list:*)",
+      "Bash(./gh-issue-dependency-test.exe list --help)",
+      "Bash(./gh-issue-dependency-test.exe list 123 --state invalid)",
+      "Bash(./gh-issue-dependency-test.exe list 123 --sort invalid)"
     ]
   }
 }

@@ -49,13 +49,33 @@ type Label struct {
 
 // Issue represents a GitHub issue with dependency-relevant fields
 type Issue struct {
-	Number    int      `json:"number"`
-	Title     string   `json:"title"`
-	State     string   `json:"state"`
-	Assignees []User   `json:"assignees"`
-	Labels    []Label  `json:"labels"`
-	HTMLURL   string   `json:"html_url"`
-	Repository string  `json:"repository,omitempty"` // Added for cross-repo dependencies
+	Number     int            `json:"number"`
+	Title      string         `json:"title"`
+	State      string         `json:"state"`
+	Assignees  []User         `json:"assignees"`
+	Labels     []Label        `json:"labels"`
+	HTMLURL    string         `json:"html_url"`
+	Repository RepositoryInfo `json:"repository,omitempty"` // Repository object from GitHub API
+}
+
+// RepositoryInfo represents repository information from GitHub API
+type RepositoryInfo struct {
+	Name     string `json:"name"`
+	FullName string `json:"full_name"`
+	HTMLURL  string `json:"html_url"`
+	Owner    struct {
+		Login string `json:"login"`
+	} `json:"owner"`
+}
+
+// String returns the string representation of the repository (FullName)
+func (r RepositoryInfo) String() string {
+	return r.FullName
+}
+
+// IsEmpty returns true if this is an empty/zero repository info
+func (r RepositoryInfo) IsEmpty() bool {
+	return r.FullName == ""
 }
 
 // DependencyRelation represents a relationship between issues
@@ -369,7 +389,11 @@ func fetchIssueDetails(ctx context.Context, client *api.RESTClient, owner, repo 
 	}
 	
 	// Add repository information for cross-repo support
-	issue.Repository = fmt.Sprintf("%s/%s", owner, repo)
+	issue.Repository = RepositoryInfo{
+		Name:     repo,
+		FullName: fmt.Sprintf("%s/%s", owner, repo),
+		Owner:    struct{ Login string `json:"login"` }{Login: owner},
+	}
 	
 	return &issue, nil
 }
@@ -379,11 +403,10 @@ func fetchDependencyRelationships(ctx context.Context, client *api.RESTClient, o
 	// API endpoint for dependency relationships
 	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s", owner, repo, issueNumber, relationType)
 	
-	var relations []struct {
-		Issue Issue `json:"issue"`
-	}
+	// Use generic interface to handle GitHub's API response format
+	var rawData interface{}
 	
-	err := client.Get(endpoint, &relations)
+	err := client.Get(endpoint, &rawData)
 	if err != nil {
 		// Handle specific error types
 		if strings.Contains(strings.ToLower(err.Error()), "not found") {
@@ -403,19 +426,35 @@ func fetchDependencyRelationships(ctx context.Context, client *api.RESTClient, o
 		return nil, WrapInternalError(fmt.Sprintf("fetching %s dependencies", relationType), err)
 	}
 	
+	// Now parse the data into our Issue structs
+	var relations []Issue
+	if rawDataBytes, err := json.Marshal(rawData); err == nil {
+		if err := json.Unmarshal(rawDataBytes, &relations); err != nil {
+			return nil, WrapInternalError(fmt.Sprintf("parsing %s dependencies", relationType), err)
+		}
+	}
+	
 	// Transform to DependencyRelation objects
 	var dependencies []DependencyRelation
 	for _, rel := range relations {
-		// Extract repository from issue HTML URL if available
+		// Add validation to catch unmarshaling issues
+		if rel.Number == 0 {
+			continue // Skip zero-value issues that indicate unmarshaling problems
+		}
+		
+		// Extract repository name - use the repository field if available, otherwise use the current repo
 		repoName := fmt.Sprintf("%s/%s", owner, repo) // Default to current repo
-		if rel.Issue.HTMLURL != "" {
-			if repoFromURL := extractRepoFromURL(rel.Issue.HTMLURL); repoFromURL != "" {
+		if rel.Repository.FullName != "" {
+			repoName = rel.Repository.FullName
+		} else if rel.HTMLURL != "" {
+			// Fallback: extract from HTML URL
+			if repoFromURL := extractRepoFromURL(rel.HTMLURL); repoFromURL != "" {
 				repoName = repoFromURL
 			}
 		}
 		
 		dependencies = append(dependencies, DependencyRelation{
-			Issue:      rel.Issue,
+			Issue:      rel,
 			Type:       relationType,
 			Repository: repoName,
 		})

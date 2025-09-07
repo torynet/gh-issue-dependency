@@ -117,7 +117,7 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 		title(""), data.SourceIssue.Number, data.SourceIssue.Title, termenv.CSI+termenv.ResetSeq)
 
 	// Repository context
-	if data.SourceIssue.Repository != "" {
+	if !data.SourceIssue.Repository.IsEmpty() {
 		fmt.Fprintf(f.options.Writer, "%sRepository: %s%s\n",
 			muted(""), data.SourceIssue.Repository, termenv.CSI+termenv.ResetSeq)
 	}
@@ -150,7 +150,7 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 			}
 
 			// Show repository context for cross-repo dependencies
-			if dep.Repository != data.SourceIssue.Repository {
+			if dep.Repository != data.SourceIssue.Repository.String() {
 				fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
 					muted(""), dep.Repository, termenv.CSI+termenv.ResetSeq)
 			}
@@ -192,7 +192,7 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 			}
 
 			// Show repository context for cross-repo dependencies
-			if dep.Repository != data.SourceIssue.Repository {
+			if dep.Repository != data.SourceIssue.Repository.String() {
 				fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
 					muted(""), dep.Repository, termenv.CSI+termenv.ResetSeq)
 			}
@@ -232,7 +232,7 @@ func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 	fmt.Fprintf(f.options.Writer, "Dependencies for: #%d - %s\n",
 		data.SourceIssue.Number, data.SourceIssue.Title)
 
-	if data.SourceIssue.Repository != "" {
+	if !data.SourceIssue.Repository.IsEmpty() {
 		fmt.Fprintf(f.options.Writer, "Repository: %s\n", data.SourceIssue.Repository)
 	}
 	fmt.Fprintf(f.options.Writer, "\n")
@@ -256,7 +256,7 @@ func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 			}
 
 			// Show repository context for cross-repo dependencies
-			if dep.Repository != data.SourceIssue.Repository {
+			if dep.Repository != data.SourceIssue.Repository.String() {
 				fmt.Fprintf(f.options.Writer, "\n       Repository: %s", dep.Repository)
 			}
 
@@ -289,7 +289,7 @@ func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 			}
 
 			// Show repository context for cross-repo dependencies
-			if dep.Repository != data.SourceIssue.Repository {
+			if dep.Repository != data.SourceIssue.Repository.String() {
 				fmt.Fprintf(f.options.Writer, "\n       Repository: %s", dep.Repository)
 			}
 
@@ -361,7 +361,7 @@ func (f *OutputFormatter) formatCSVOutput(data *DependencyData) error {
 
 	// Source issue
 	fmt.Fprintf(f.options.Writer, "source,%s,%d,%s,%s",
-		escapeCSV(data.SourceIssue.Repository),
+		escapeCSV(data.SourceIssue.Repository.String()),
 		data.SourceIssue.Number,
 		escapeCSV(data.SourceIssue.Title),
 		data.SourceIssue.State)
@@ -647,7 +647,7 @@ func (f *OutputFormatter) getEmptyStateMessage(data *DependencyData) (string, st
 	default: // "all"
 		mainMsg = fmt.Sprintf("No dependencies found for issue #%d.", data.SourceIssue.Number)
 		tipMsg = "Use 'gh issue-dependency add' to create dependency relationships."
-		if data.SourceIssue.Repository != "" {
+		if !data.SourceIssue.Repository.IsEmpty() {
 			tipMsg += "\nNote: Some dependencies may exist in repositories you don't have access to."
 		}
 	}
