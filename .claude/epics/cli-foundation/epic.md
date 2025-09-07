@@ -1,8 +1,9 @@
 ---
 name: cli-foundation
-status: backlog
+status: completed
 created: 2025-09-06T21:00:16Z
-progress: 0%
+completed: 2025-09-07T02:41:13Z
+progress: 100%
 prd: .claude/prds/cli-foundation.md
 github: https://github.com/torynet/gh-issue-dependency/issues/1
 ---
