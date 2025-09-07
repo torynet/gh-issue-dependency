@@ -13,20 +13,42 @@ var Version = "dev"
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "gh-issue-dependency",
-	Short: "Manage issue dependencies in GitHub repositories",
-	Long: `A GitHub CLI extension for managing issue dependencies using GitHub's native dependency API.
+	Short: "Manage GitHub issue dependencies",
+	Long: `Manage issue dependencies in GitHub repositories using GitHub's native dependency API.
 
-This tool allows you to:
-- View dependency relationships between issues
-- Add dependencies between issues  
-- Remove existing dependencies
-- Manage cross-repository issue dependencies
+This extension helps you organize complex projects by creating dependency relationships
+between issues, whether in the same repository or across different repositories.
 
-Examples:
-  gh issue-dependency list
-  gh issue-dependency add 123 456
-  gh issue-dependency remove 123 456
-  gh issue-dependency list --repo owner/repo`,
+USAGE
+  gh issue-dependency <command>
+
+CORE COMMANDS
+  list     List issue dependencies and relationships
+  add      Add dependency relationships between issues
+  remove   Remove existing dependency relationships
+
+FLAGS
+  -R, --repo OWNER/REPO   Select repository using OWNER/REPO format
+
+EXAMPLES
+  # List all dependencies for issue #123
+  gh issue-dependency list 123
+
+  # Make issue #123 depend on issue #456  
+  gh issue-dependency add 123 --blocked-by 456
+
+  # Remove a dependency relationship
+  gh issue-dependency remove 123 --blocked-by 456
+
+  # Work with issues in a different repository
+  gh issue-dependency list 123 --repo owner/other-repo
+
+AUTHENTICATION
+  This extension uses the same authentication as the GitHub CLI. Run 'gh auth status' 
+  to check your authentication status. Use 'gh auth login' if you need to authenticate.
+
+LEARN MORE
+  Use 'gh issue-dependency <command> --help' for more information about a specific command.`,
 	Version: Version,
 	Run: func(cmd *cobra.Command, args []string) {
 		// If no subcommand is specified, show help

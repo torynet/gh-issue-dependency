@@ -11,24 +11,47 @@ import (
 // addCmd represents the add command
 var addCmd = &cobra.Command{
 	Use:   "add <issue-number>",
-	Short: "Add a dependency relationship between issues",
-	Long: `Add a dependency relationship between two issues. You must specify either:
-- --blocked-by to indicate the issue is blocked by another issue
-- --blocks to indicate the issue blocks another issue
+	Short: "Add dependency relationships between issues",
+	Long: `Add a dependency relationship between two issues using GitHub's native dependency API.
 
-This creates a dependency link using GitHub's native dependency API.
-Dependencies can be within the same repository or cross-repository.`,
-	Example: `  # Add issue 123 as blocked by issue 456
+RELATIONSHIP TYPES
+You must specify exactly one of the following relationship types:
+
+  --blocked-by   The specified issue is blocked by other issues
+                 (those issues must be completed first)
+                 
+  --blocks       The specified issue blocks other issues  
+                 (this issue must be completed before those issues)
+
+ISSUE REFERENCES
+Issues can be referenced in multiple ways:
+  • Simple number: 123 (same repository)
+  • Full reference: owner/repo#123 (cross-repository)
+  • Multiple issues: 123,456,789 (comma-separated, no spaces)
+
+VALIDATION
+The command validates that:
+  • All referenced issues exist and are accessible
+  • You have permission to modify the specified issues
+  • The dependency relationship doesn't create cycles
+
+FLAGS
+  --blocked-by string   Issue number(s) that block this issue (comma-separated)
+  --blocks string       Issue number(s) that this issue blocks (comma-separated)`,
+	Example: `  # Make issue #123 depend on issue #456
   gh issue-dependency add 123 --blocked-by 456
 
-  # Add issue 123 as blocking issue 789
+  # Make issue #123 block issue #789
   gh issue-dependency add 123 --blocks 789
 
   # Add cross-repository dependency
   gh issue-dependency add 123 --blocked-by owner/other-repo#456
 
-  # Add multiple dependencies
-  gh issue-dependency add 123 --blocked-by 456,789`,
+  # Add multiple dependencies at once
+  gh issue-dependency add 123 --blocked-by 456,789,101
+
+  # Work with issues in a different repository
+  gh issue-dependency add 123 --blocks 456 --repo owner/other-repo`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]

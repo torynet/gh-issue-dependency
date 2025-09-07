@@ -10,23 +10,39 @@ import (
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list <issue-number>",
-	Short: "List dependencies for an issue",
+	Short: "List issue dependencies and relationships",
 	Long: `List all dependencies for the specified issue, showing both blocking and blocked-by relationships.
 
-This command displays:
-- Issues that are blocking the specified issue (dependencies)
-- Issues that are blocked by the specified issue (dependents)
-- Cross-repository dependencies when applicable
+DEPENDENCIES SHOWN
+  • Blocking issues: Issues that must be resolved before this issue can be completed
+  • Blocked issues: Issues that are waiting for this issue to be completed  
+  • Cross-repository dependencies when applicable
 
-The output includes issue numbers, titles, and current status.`,
-	Example: `  # List dependencies for issue 123
+OUTPUT FORMATS
+  • table (default): Human-readable table format with issue titles and states
+  • json: Machine-readable JSON for scripting and integration
+  • csv: Comma-separated values for spreadsheet import
+
+The output includes issue numbers, repository information, titles, current status,
+and relationship type (blocking vs blocked).
+
+FLAGS
+  --detailed       Show detailed dependency information including dates and users
+  --format string  Output format: table, json, csv (default "table")`,
+	Example: `  # List all dependencies for issue #123
   gh issue-dependency list 123
 
-  # List dependencies for issue in a specific repository  
-  gh issue-dependency list 456 --repo owner/repo
+  # List dependencies for issue in a different repository  
+  gh issue-dependency list 456 --repo owner/other-repo
 
-  # List dependencies with detailed output
-  gh issue-dependency list 789 --detailed`,
+  # Show detailed dependency information
+  gh issue-dependency list 789 --detailed
+
+  # Output dependencies as JSON for scripting
+  gh issue-dependency list 123 --format json
+
+  # Export dependencies to CSV for analysis
+  gh issue-dependency list 456 --format csv > dependencies.csv`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]

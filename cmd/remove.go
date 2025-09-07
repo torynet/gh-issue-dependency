@@ -11,24 +11,51 @@ import (
 // removeCmd represents the remove command
 var removeCmd = &cobra.Command{
 	Use:   "remove <issue-number>",
-	Short: "Remove a dependency relationship between issues",
-	Long: `Remove an existing dependency relationship between two issues. You must specify either:
-- --blocked-by to remove a "blocked by" relationship
-- --blocks to remove a "blocks" relationship
+	Short: "Remove dependency relationships between issues",
+	Long: `Remove existing dependency relationships between issues using GitHub's native dependency API.
 
-This removes the dependency link using GitHub's native dependency API.
-Works for both same-repository and cross-repository dependencies.`,
-	Example: `  # Remove issue 123 being blocked by issue 456
+RELATIONSHIP TYPES TO REMOVE
+You must specify exactly one of the following relationship types:
+
+  --blocked-by   Remove issues that are blocking the specified issue
+                 (removes the "blocked by" relationship)
+                 
+  --blocks       Remove issues that are blocked by the specified issue
+                 (removes the "blocks" relationship)
+
+ISSUE REFERENCES
+Issues can be referenced in multiple ways:
+  • Simple number: 123 (same repository)
+  • Full reference: owner/repo#123 (cross-repository)  
+  • Multiple issues: 123,456,789 (comma-separated, no spaces)
+
+SAFETY CONSIDERATIONS
+The command will:
+  • Validate that the specified relationships exist before attempting removal
+  • Show which relationships will be removed before making changes
+  • Fail gracefully if any referenced issues don't exist or aren't accessible
+  • Not require confirmation by default (relationships can be easily re-added)
+
+Note: Removing a dependency relationship does not affect the issues themselves,
+only the dependency links between them.
+
+FLAGS
+  --blocked-by string   Issue number(s) to remove from blocking this issue (comma-separated)
+  --blocks string       Issue number(s) to remove from being blocked by this issue (comma-separated)`,
+	Example: `  # Remove issue #456 from blocking issue #123
   gh issue-dependency remove 123 --blocked-by 456
 
-  # Remove issue 123 blocking issue 789
+  # Remove issue #789 from being blocked by issue #123  
   gh issue-dependency remove 123 --blocks 789
 
   # Remove cross-repository dependency
   gh issue-dependency remove 123 --blocked-by owner/other-repo#456
 
-  # Remove multiple dependencies
-  gh issue-dependency remove 123 --blocked-by 456,789`,
+  # Remove multiple dependencies at once
+  gh issue-dependency remove 123 --blocked-by 456,789,101
+
+  # Work with issues in a different repository
+  gh issue-dependency remove 123 --blocks 456 --repo owner/other-repo`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]
