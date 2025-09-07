@@ -38,6 +38,32 @@ go build -o gh-issue-dependency
 go test ./...
 ```
 
+### Quick Development Testing
+
+For fast, repeatable testing during development:
+
+```bash
+# Build and test the current version
+go run main.go --help              # Test help system
+go run main.go --version           # Test version display
+go run main.go list --help         # Test command help
+
+# Test with real repository (requires auth)
+go run main.go list 123             # Test list command (will show "not implemented")
+go run main.go add 123 --blocks 124 # Test add command (will show "not implemented") 
+go run main.go remove 123 --blocks 124 # Test remove command (will show "not implemented")
+
+# Quick build and install for testing
+go build -o /tmp/gh-issue-dependency && /tmp/gh-issue-dependency --help
+
+# Test error handling
+go run main.go invalid-command      # Should show error and help
+go run main.go list                 # Should show "missing issue number"
+go run main.go add 123              # Should show "missing relationship flag"
+```
+
+**Note**: Commands will show "not implemented yet" until the actual dependency management logic is built. This tests the CLI framework, argument parsing, help system, and error handling.
+
 ### Development Dependencies
 
 ```bash
