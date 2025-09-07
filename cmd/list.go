@@ -33,6 +33,7 @@ FLAGS
   --detailed       Show detailed dependency information including dates and users
   --format string  Output format: table, json, csv (default "table")
   --state string   Filter dependencies by issue state: all, open, closed (default "all")
+  --sort string    Sort dependencies by: number, title, state, repository (default "number")
   --json string    Output JSON with specific fields (e.g., "blocked_by,blocks")`,
 	Example: `  # List all dependencies for issue #123
   gh issue-dependency list 123
@@ -56,7 +57,13 @@ FLAGS
   gh issue-dependency list 123 --state open
 
   # List closed dependencies in JSON format
-  gh issue-dependency list 456 --state closed --format json`,
+  gh issue-dependency list 456 --state closed --format json
+
+  # Sort dependencies by title
+  gh issue-dependency list 123 --sort title
+
+  # Sort cross-repository dependencies by repository name
+  gh issue-dependency list 456 --sort repository`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]
@@ -114,9 +121,28 @@ FLAGS
 				WithSuggestion("Use one of: all, open, closed")
 		}
 
+		// Validate the sort option against supported sort orders.
+		// We support number (default), title, state, and repository for sorting dependencies.
+		validSorts := []string{"number", "title", "state", "repository"}
+		isValidSort := false
+		for _, sort := range validSorts {
+			if listSort == sort {
+				isValidSort = true
+				break
+			}
+		}
+		if !isValidSort {
+			return pkg.NewAppError(
+				pkg.ErrorTypeValidation,
+				fmt.Sprintf("Invalid sort: %s", listSort),
+				nil,
+			).WithContext("sort", listSort).
+				WithSuggestion("Use one of: number, title, state, repository")
+		}
+
 		// Fetch dependency data from GitHub API and display results
 		// This replaces the placeholder output with real GitHub API integration
-		return fetchAndDisplayDependencies(owner, repo, issueNum, listFormat, listState, listDetailed)
+		return fetchAndDisplayDependencies(owner, repo, issueNum, listFormat, listState, listSort, listDetailed)
 	},
 }
 
@@ -134,6 +160,10 @@ var (
 	// Supported states: all (default), open, closed
 	listState string
 	
+	// listSort specifies the sort order for dependencies.
+	// Supported orders: number (default), title, state, repository
+	listSort string
+	
 	// listJSON specifies JSON fields for selective output
 	// When set, overrides listFormat to use JSON with specific fields
 	listJSON string
@@ -141,10 +171,13 @@ var (
 
 // fetchAndDisplayDependencies fetches real dependency data from GitHub API and displays it
 // This function replaces the placeholder output with actual GitHub API integration
-func fetchAndDisplayDependencies(owner, repo string, issueNum int, format, state string, detailed bool) error {
+func fetchAndDisplayDependencies(owner, repo string, issueNum int, format, state, sortOrder string, detailed bool) error {
 	// Create context with timeout for API calls
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+	
+	// Clean expired cache entries periodically (fail silently if error)
+	go pkg.CleanExpiredCache()
 	
 	// Fetch dependency data from GitHub API
 	originalData, err := pkg.FetchIssueDependencies(ctx, owner, repo, issueNum)
@@ -154,6 +187,9 @@ func fetchAndDisplayDependencies(owner, repo string, issueNum int, format, state
 	
 	// Apply state filtering, keeping reference to original data
 	filteredData := applyStateFilter(originalData, state)
+	
+	// Apply sorting to the filtered data
+	filteredData = applySorting(filteredData, sortOrder)
 	
 	// Determine output format and create formatter
 	outputOptions := pkg.DefaultOutputOptions()
@@ -238,6 +274,91 @@ func applyStateFilter(data *pkg.DependencyData, state string) *pkg.DependencyDat
 	return filtered
 }
 
+// applySorting sorts dependencies based on the specified sort order
+func applySorting(data *pkg.DependencyData, sortOrder string) *pkg.DependencyData {
+	if sortOrder == "" || sortOrder == "number" {
+		// Default is already sorted by number from API, no need to re-sort
+		return data
+	}
+	
+	// Create a copy to avoid modifying the original
+	sorted := &pkg.DependencyData{
+		SourceIssue:            data.SourceIssue,
+		BlockedBy:              make([]pkg.DependencyRelation, len(data.BlockedBy)),
+		Blocking:               make([]pkg.DependencyRelation, len(data.Blocking)),
+		FetchedAt:              data.FetchedAt,
+		TotalCount:             data.TotalCount,
+		OriginalBlockedByCount: data.OriginalBlockedByCount,
+		OriginalBlockingCount:  data.OriginalBlockingCount,
+	}
+	
+	// Copy dependencies for sorting
+	copy(sorted.BlockedBy, data.BlockedBy)
+	copy(sorted.Blocking, data.Blocking)
+	
+	// Sort blocked_by relationships
+	sortDependencySlice(sorted.BlockedBy, sortOrder)
+	
+	// Sort blocking relationships
+	sortDependencySlice(sorted.Blocking, sortOrder)
+	
+	return sorted
+}
+
+// sortDependencySlice sorts a slice of dependencies based on the sort order
+func sortDependencySlice(deps []pkg.DependencyRelation, sortOrder string) {
+	switch sortOrder {
+	case "title":
+		// Sort by issue title alphabetically
+		for i := 0; i < len(deps)-1; i++ {
+			for j := i + 1; j < len(deps); j++ {
+				if strings.ToLower(deps[i].Issue.Title) > strings.ToLower(deps[j].Issue.Title) {
+					deps[i], deps[j] = deps[j], deps[i]
+				}
+			}
+		}
+	case "state":
+		// Sort by state (open first, then closed)
+		for i := 0; i < len(deps)-1; i++ {
+			for j := i + 1; j < len(deps); j++ {
+				if stateOrder(deps[i].Issue.State) > stateOrder(deps[j].Issue.State) {
+					deps[i], deps[j] = deps[j], deps[i]
+				}
+			}
+		}
+	case "repository":
+		// Sort by repository name alphabetically
+		for i := 0; i < len(deps)-1; i++ {
+			for j := i + 1; j < len(deps); j++ {
+				if strings.ToLower(deps[i].Repository) > strings.ToLower(deps[j].Repository) {
+					deps[i], deps[j] = deps[j], deps[i]
+				}
+			}
+		}
+	case "number":
+		// Sort by issue number (ascending)
+		for i := 0; i < len(deps)-1; i++ {
+			for j := i + 1; j < len(deps); j++ {
+				if deps[i].Issue.Number > deps[j].Issue.Number {
+					deps[i], deps[j] = deps[j], deps[i]
+				}
+			}
+		}
+	}
+}
+
+// stateOrder returns a numeric value for state sorting (open = 0, closed = 1)
+func stateOrder(state string) int {
+	switch strings.ToLower(state) {
+	case "open":
+		return 0
+	case "closed":
+		return 1
+	default:
+		return 2
+	}
+}
+
 // init registers the list command with the root command and sets up its flags.
 func init() {
 	rootCmd.AddCommand(listCmd)
@@ -246,5 +367,6 @@ func init() {
 	listCmd.Flags().BoolVar(&listDetailed, "detailed", false, "Show detailed dependency information including dates and users")
 	listCmd.Flags().StringVar(&listFormat, "format", "table", "Output format: table (default), json, csv")
 	listCmd.Flags().StringVar(&listState, "state", "all", "Filter dependencies by issue state: all (default), open, closed")
+	listCmd.Flags().StringVar(&listSort, "sort", "number", "Sort dependencies by: number (default), title, state, repository")
 	listCmd.Flags().StringVar(&listJSON, "json", "", "Output JSON with specific fields: e.g. 'blocked_by,blocks' or 'summary'")
 }

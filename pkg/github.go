@@ -6,9 +6,12 @@ package pkg
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -72,6 +75,18 @@ type DependencyData struct {
 	OriginalBlockedByCount  int                  `json:"original_blocked_by_count,omitempty"`
 	OriginalBlockingCount   int                  `json:"original_blocking_count,omitempty"`
 }
+
+// CacheEntry represents a cached dependency data entry
+type CacheEntry struct {
+	Data      DependencyData `json:"data"`
+	ExpiresAt time.Time      `json:"expires_at"`
+}
+
+// Cache configuration
+const (
+	CacheDir     = ".gh-issue-dependency-cache"
+	CacheDuration = 5 * time.Minute // Cache for 5 minutes
+)
 
 // Repository Context Detection
 //
@@ -511,6 +526,12 @@ func FetchIssueDependencies(ctx context.Context, owner, repo string, issueNumber
 		return nil, NewIssueNumberValidationError(strconv.Itoa(issueNumber))
 	}
 	
+	// Try to get from cache first
+	cacheKey := getCacheKey(owner, repo, issueNumber)
+	if data, found := getFromCache(cacheKey); found {
+		return data, nil
+	}
+	
 	// Verify GitHub CLI authentication
 	if err := SetupGitHubClient(); err != nil {
 		return nil, err
@@ -522,5 +543,133 @@ func FetchIssueDependencies(ctx context.Context, owner, repo string, issueNumber
 	}
 	
 	// Fetch dependency data
-	return fetchDependencies(ctx, owner, repo, issueNumber)
+	data, err := fetchDependencies(ctx, owner, repo, issueNumber)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Cache the result
+	saveToCache(cacheKey, data)
+	
+	return data, nil
+}
+
+// getCacheKey generates a unique cache key for the request
+func getCacheKey(owner, repo string, issueNumber int) string {
+	key := fmt.Sprintf("%s/%s#%d", owner, repo, issueNumber)
+	hash := md5.Sum([]byte(key))
+	return fmt.Sprintf("%x", hash)
+}
+
+// getCacheDir returns the cache directory path
+func getCacheDir() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return CacheDir // fallback to relative path
+	}
+	return filepath.Join(homeDir, CacheDir)
+}
+
+// getFromCache attempts to retrieve data from cache
+func getFromCache(key string) (*DependencyData, bool) {
+	cacheDir := getCacheDir()
+	cachePath := filepath.Join(cacheDir, key+".json")
+	
+	// Check if cache file exists
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		return nil, false
+	}
+	
+	// Read cache file
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		return nil, false
+	}
+	
+	// Parse cache entry
+	var entry CacheEntry
+	if err := json.Unmarshal(data, &entry); err != nil {
+		return nil, false
+	}
+	
+	// Check if cache entry has expired
+	if time.Now().After(entry.ExpiresAt) {
+		// Remove expired cache file
+		os.Remove(cachePath)
+		return nil, false
+	}
+	
+	return &entry.Data, true
+}
+
+// saveToCache stores data in cache
+func saveToCache(key string, data *DependencyData) {
+	cacheDir := getCacheDir()
+	
+	// Create cache directory if it doesn't exist
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return // fail silently
+	}
+	
+	// Create cache entry
+	entry := CacheEntry{
+		Data:      *data,
+		ExpiresAt: time.Now().Add(CacheDuration),
+	}
+	
+	// Marshal to JSON
+	jsonData, err := json.Marshal(entry)
+	if err != nil {
+		return // fail silently
+	}
+	
+	// Write to cache file
+	cachePath := filepath.Join(cacheDir, key+".json")
+	os.WriteFile(cachePath, jsonData, 0644)
+}
+
+// CleanExpiredCache removes expired cache entries
+func CleanExpiredCache() error {
+	cacheDir := getCacheDir()
+	
+	// Check if cache directory exists
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		return nil // no cache to clean
+	}
+	
+	// Read cache directory
+	files, err := os.ReadDir(cacheDir)
+	if err != nil {
+		return err
+	}
+	
+	now := time.Now()
+	for _, file := range files {
+		if !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+		
+		cachePath := filepath.Join(cacheDir, file.Name())
+		
+		// Read cache file
+		data, err := os.ReadFile(cachePath)
+		if err != nil {
+			continue
+		}
+		
+		// Parse cache entry
+		var entry CacheEntry
+		if err := json.Unmarshal(data, &entry); err != nil {
+			// Remove malformed cache files
+			os.Remove(cachePath)
+			continue
+		}
+		
+		// Remove expired entries
+		if now.After(entry.ExpiresAt) {
+			os.Remove(cachePath)
+		}
+	}
+	
+	return nil
 }
