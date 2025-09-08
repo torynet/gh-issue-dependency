@@ -16,6 +16,7 @@ gh-issue-dependency
 
 # Output of the go coverage tool
 *.out
+coverage.html
 
 # Go workspace file
 go.work
@@ -44,3 +45,11 @@ go.work.sum
 
 # OS generated files
 Thumbs.db
+
+# Dev Tools
+.claude/
+.workplans/
+AGENTS.md
+COMMANDS.md
+
+# Other
