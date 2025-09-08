@@ -1,0 +1,78 @@
+site_name: gh-issue-dependency
+site_description: A powerful GitHub CLI extension for managing issue dependencies
+site_author: Tory Network
+site_url: https://torynet.github.io/gh-issue-dependency
+
+repo_name: torynet/gh-issue-dependency
+repo_url: https://github.com/torynet/gh-issue-dependency
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.action.edit
+    - content.action.view
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation & Setup: getting-started/index.md
+  - Commands:
+    - Overview: commands/index.md
+    - list: commands/list.md
+    - add: commands/add.md
+    - remove: commands/remove.md
+  - Examples: examples/index.md
+  - Troubleshooting: troubleshooting/index.md
+
+plugins:
+  - search
+  - social:
+      cards_layout_options:
+        background_color: "#673ab7"
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/torynet/gh-issue-dependency
+    - icon: fontawesome/solid/globe
+      link: https://torynet.github.io
+
+copyright: Copyright &copy; 2024 Tory Network

@@ -1,8 +1,9 @@
 ---
 name: dependency-add
-status: backlog
+status: completed
 created: 2025-09-06T21:33:37Z
-progress: 0%
+completed: 2025-09-07T07:47:12Z
+progress: 100%
 prd: .claude/prds/dependency-add.md
 github: https://github.com/torynet/gh-issue-dependency/issues/15
 ---

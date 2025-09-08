@@ -1,84 +1,99 @@
 # gh-issue-dependency
 
-A GitHub CLI extension for managing issue dependencies using GitHub's native dependency API. This tool helps you organize complex projects by creating and managing dependency relationships between issues, whether in the same repository or across different repositories.
+[![Go Report Card](https://goreportcard.com/badge/github.com/torynet/gh-issue-dependency)](https://goreportcard.com/report/github.com/torynet/gh-issue-dependency)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub Release](https://img.shields.io/github/release/torynet/gh-issue-dependency.svg)](https://github.com/torynet/gh-issue-dependency/releases)
+[![Documentation](https://img.shields.io/badge/docs-gh--pages-blue)](https://torynet.github.io/gh-issue-dependency/)
 
-## Features
+A powerful GitHub CLI extension for managing issue dependencies with comprehensive validation, safety features, and cross-repository support. Organize complex projects by creating and managing dependency relationships between GitHub issues.
 
-- **Issue Dependencies**: Create blocking and blocked-by relationships between issues
-- **Cross-Repository Support**: Manage dependencies across different repositories  
-- **Multiple Output Formats**: View dependencies in table, JSON, or CSV format
-- **GitHub CLI Integration**: Seamless integration with existing GitHub CLI workflows
-- **Native API**: Uses GitHub's official dependency API for maximum compatibility
-- **Comprehensive Validation**: Prevents circular dependencies and validates permissions
+## ✨ Features
 
-## Installation
+- 🔗 **Complete Dependency Management** - Create, view, and remove "blocks" and "blocked-by" relationships
+- 🛡️ **Safety First** - Dry-run mode, confirmation prompts, and circular dependency prevention
+- 🌐 **Cross-Repository Support** - Manage dependencies across different repositories and organizations
+- 📊 **Multiple Output Formats** - TTY-optimized, JSON, and plain text formats for any workflow
+- ⚡ **Performance & Reliability** - Built-in retry logic, rate limiting handling, and comprehensive error messages
+- 🎯 **Batch Operations** - Handle multiple dependencies efficiently with comma-separated lists
+- 🔐 **Enterprise Ready** - GitHub Enterprise Server support with proper authentication and permissions
+
+## 🚀 Installation
 
 ### Prerequisites
 
-- **Go 1.19 or later** - [Install Go](https://golang.org/doc/install)
 - **GitHub CLI** - [Install GitHub CLI](https://cli.github.com/) and authenticate with `gh auth login`
+- **Git** installed on your system
 
-### Install as GitHub CLI Extension (Recommended)
+### Quick Install (Recommended)
 
 ```bash
-# Install the extension
-gh extension install torynet/gh-issue-dependency
+# Install via Go (requires Go 1.19+)
+go install github.com/torynet/gh-issue-dependency@latest
 
 # Verify installation
 gh issue-dependency --help
 ```
 
-### Install from Source
+### Download Binary
+
+1. Visit [Releases](https://github.com/torynet/gh-issue-dependency/releases)
+2. Download the binary for your system
+3. Extract and place in your PATH
+
+### Package Managers
 
 ```bash
-# Clone the repository
-git clone https://github.com/torynet/gh-issue-dependency
-cd gh-issue-dependency
+# Homebrew (macOS/Linux)
+brew install torynet/tap/gh-issue-dependency
 
-# Build the binary
-go build -o gh-issue-dependency
+# Chocolatey (Windows)
+choco install gh-issue-dependency
 
-# Move to your PATH (optional)
-sudo mv gh-issue-dependency /usr/local/bin/
+# Scoop (Windows)
+scoop install gh-issue-dependency
 ```
 
-### Install via Go
+📖 **[Complete Installation Guide →](https://torynet.github.io/gh-issue-dependency/getting-started/)**
+
+## 🏃 Quick Start
+
+### 1. Authenticate with GitHub
 
 ```bash
-go install github.com/torynet/gh-issue-dependency@latest
-```
-
-## Quick Start
-
-### Authentication
-
-This extension uses your existing GitHub CLI authentication. Verify you're authenticated:
-
-```bash
+# Check authentication status
 gh auth status
-```
 
-If you need to authenticate:
-
-```bash
+# Login if needed
 gh auth login
 ```
 
-### Basic Usage
+### 2. Your First Dependency
 
 ```bash
-# List all dependencies for issue #123
+# Navigate to your repository
+cd /path/to/your/repo
+
+# List current dependencies
 gh issue-dependency list 123
 
-# Make issue #123 depend on issue #456 (123 is blocked by 456)
+# Create a dependency (issue #123 is blocked by #456)
 gh issue-dependency add 123 --blocked-by 456
 
-# Make issue #123 block issue #789 (789 is blocked by 123)  
-gh issue-dependency add 123 --blocks 789
-
-# Remove a dependency relationship
-gh issue-dependency remove 123 --blocked-by 456
+# Verify the relationship was created
+gh issue-dependency list 123
 ```
+
+### 3. Preview Changes Safely
+
+```bash
+# Preview what would be created
+gh issue-dependency add 123 --blocks 789 --dry-run
+
+# Execute after reviewing
+gh issue-dependency add 123 --blocks 789
+```
+
+🎓 **[Full Tutorial →](https://torynet.github.io/gh-issue-dependency/getting-started/)**
 
 ## Detailed Usage
 
@@ -297,48 +312,31 @@ blocking=$(gh issue-dependency list 123 --format json | jq -r '.blocking[].numbe
 gh issue-dependency remove 123 --blocked-by "${blocking%,}"
 ```
 
-## Project Structure
+## 🤝 Contributing
 
-```
-gh-issue-dependency/
-├── main.go                      # Application entry point
-├── cmd/                         # Command implementations
-│   ├── root.go                  # Root command and global flags
-│   ├── list.go                  # List command implementation
-│   ├── add.go                   # Add command implementation
-│   └── remove.go                # Remove command implementation
-├── pkg/                         # Shared utilities and types
-│   ├── github.go                # GitHub API integration
-│   └── errors.go                # Error handling and formatting
-├── tests/                       # Integration tests
-│   └── integration_test.sh      # Test suite
-├── go.mod                       # Go module definition
-├── go.sum                       # Dependency checksums
-├── README.md                    # This file
-├── CONTRIBUTING.md              # Developer guide
-└── LICENSE                      # MIT license
-```
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Development setup and testing
+- Code style and guidelines  
+- Pull request process
 
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on:
-- Development setup
-- Running tests
-- Code style guidelines
-- Submitting pull requests
-
-## License
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## Support
+## 🆘 Support
 
-- **Issues**: [GitHub Issues](https://github.com/torynet/gh-issue-dependency/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/torynet/gh-issue-dependency/discussions)  
-- **Documentation**: This README and `gh issue-dependency <command> --help`
+- 📖 **[Documentation](https://torynet.github.io/gh-issue-dependency/)** - Comprehensive guides and examples
+- 🐛 **[Issues](https://github.com/torynet/gh-issue-dependency/issues)** - Bug reports and feature requests
+- 💬 **[Discussions](https://github.com/torynet/gh-issue-dependency/discussions)** - Questions and community
+- 📝 **Help**: Run `gh issue-dependency <command> --help` for command-specific help
 
-## Related Projects
+## 🌟 Star History
 
-- [GitHub CLI](https://cli.github.com/) - The official GitHub command line tool
-- [GitHub Issues](https://docs.github.com/en/issues) - GitHub's issue tracking documentation
-- [GitHub Dependencies API](https://docs.github.com/en/rest/issues/issues#create-an-issue-repository) - The underlying API this tool uses
+If this tool helps you manage your projects better, please consider giving it a star! ⭐
+
+---
+
+<div align="center">
+  <p><strong>Made with ❤️ for the GitHub community</strong></p>
+  <p>Built with <a href="https://go.dev/">Go</a> • Powered by <a href="https://cli.github.com/">GitHub CLI</a></p>
+</div>
