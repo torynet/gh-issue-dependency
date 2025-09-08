@@ -1,0 +1,249 @@
+name: Trunk-Based Release Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      promote_rc_to_release:
+        description: 'RC tag to promote to release (e.g., v1.2.0-rc1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # Runs on main branch pushes (squash merges)
+  create-rc:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Create RC from Main Push
+    runs-on: ubuntu-latest
+    outputs:
+      rc_tag: ${{ steps.version.outputs.rc_tag }}
+      should_create_rc: ${{ steps.conventional.outputs.should_release }}
+      new_version: ${{ steps.version.outputs.new_version }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Analyze conventional commit
+        id: conventional
+        run: |
+          COMMIT_MSG="$(git log -1 --pretty=%B)"
+          echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          
+          # Check if this is a conventional commit that should trigger release
+          if [[ "$COMMIT_MSG" =~ ^(feat|fix|perf)(\(.+\))?!?: .+ ]] || [[ "$COMMIT_MSG" =~ BREAKING.CHANGE ]]; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            
+            # Determine version bump type
+            if [[ "$COMMIT_MSG" =~ ^(feat|fix|perf)(\(.+\))?!: ]] || [[ "$COMMIT_MSG" =~ BREAKING.CHANGE ]]; then
+              echo "bump_type=major" >> $GITHUB_OUTPUT
+            elif [[ "$COMMIT_MSG" =~ ^feat(\(.+\))?: ]]; then
+              echo "bump_type=minor" >> $GITHUB_OUTPUT  
+            else
+              echo "bump_type=patch" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Commit does not follow conventional commit format for releases: $COMMIT_MSG"
+          fi
+
+      - name: Calculate next version
+        if: steps.conventional.outputs.should_release == 'true'
+        id: version
+        run: |
+          # Get latest release tag (not RC tags)
+          LATEST_TAG=$(git tag -l "v*" | grep -v "rc" | sort -V | tail -1)
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v0.0.0"
+          fi
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          
+          # Parse version numbers
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]:-0}
+          PATCH=${VERSION_PARTS[2]:-0}
+          
+          # Bump version based on conventional commit
+          case "${{ steps.conventional.outputs.bump_type }}" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+          
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          RC_TAG="v${NEW_VERSION}-rc1"
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "rc_tag=$RC_TAG" >> $GITHUB_OUTPUT
+          
+          echo "🏷️ Next version: $NEW_VERSION (from $LATEST_TAG, bump: ${{ steps.conventional.outputs.bump_type }})"
+
+      - name: Create RC Tag
+        if: steps.conventional.outputs.should_release == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag -a "${{ steps.version.outputs.rc_tag }}" -m "Release Candidate ${{ steps.version.outputs.rc_tag }}"
+          git push origin "${{ steps.version.outputs.rc_tag }}"
+          
+          echo "🚀 Created RC tag: ${{ steps.version.outputs.rc_tag }}"
+
+  # Build RC (beta) version
+  build-rc:
+    if: needs.create-rc.outputs.should_create_rc == 'true'
+    name: Build RC (Beta)
+    needs: create-rc
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin  
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-1.21-${{ hashFiles('**/go.sum') }}
+
+      - name: Build RC Binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            EXT=".exe"
+          fi
+          
+          BINARY_NAME="gh-issue-dependency-${{ needs.create-rc.outputs.rc_tag }}-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
+          
+          go build \
+            -ldflags "-s -w -X cmd.Version=${{ needs.create-rc.outputs.rc_tag }} -X cmd.Commit=${GITHUB_SHA:0:8} -X cmd.BuildType=beta" \
+            -o "dist/${BINARY_NAME}" \
+            .
+          
+          # Create checksums
+          cd dist
+          sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
+
+      - name: Upload RC artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: rc-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/
+
+  # Manual gate using GitHub Environment
+  promote-gate:
+    if: needs.create-rc.outputs.should_create_rc == 'true' || github.event_name == 'workflow_dispatch'
+    name: Release Approval Gate
+    needs: [create-rc, build-rc]
+    runs-on: ubuntu-latest
+    environment: 
+      name: release-approval
+      url: https://github.com/${{ github.repository }}/releases
+    
+    steps:
+      - name: Awaiting Release Approval
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "🚀 Manual promotion requested for ${{ github.event.inputs.promote_rc_to_release }}"
+            echo "📋 Promoting RC to production release..."
+          else
+            echo "📋 RC ${{ needs.create-rc.outputs.rc_tag }} built successfully"
+            echo "🏗️ Beta binaries available for testing"
+            echo "⏳ Waiting for release approval..."
+            echo ""
+            echo "To test the RC build:"
+            echo "1. Download artifacts from this workflow run"
+            echo "2. Test the beta binaries"
+            echo "3. If ready, approve this deployment to create production release"
+          fi
+
+  # Create release tag and build final release
+  create-release:
+    name: Create Release Build  
+    needs: [create-rc, promote-gate]
+    runs-on: ubuntu-latest
+    if: always() && needs.promote-gate.result == 'success'
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine release tag
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RC_TAG="${{ github.event.inputs.promote_rc_to_release }}"
+          else
+            RC_TAG="${{ needs.create-rc.outputs.rc_tag }}"
+          fi
+          
+          # Convert RC tag to release tag (v1.2.0-rc1 -> v1.2.0)
+          RELEASE_TAG=${RC_TAG%-rc*}
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "rc_tag=$RC_TAG" >> $GITHUB_OUTPUT
+          
+          echo "🏷️ Creating release tag: $RELEASE_TAG (from RC: $RC_TAG)"
+
+      - name: Create Release Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Get the commit that the RC tag points to
+          RC_COMMIT=$(git rev-list -n 1 "${{ steps.release.outputs.rc_tag }}")
+          
+          git tag -a "${{ steps.release.outputs.release_tag }}" $RC_COMMIT -m "Release ${{ steps.release.outputs.release_tag }}"
+          git push origin "${{ steps.release.outputs.release_tag }}"
+          
+          echo "✅ Created release tag: ${{ steps.release.outputs.release_tag }}"
+
+  # This job will be triggered by the release tag created above
+  notify-success:
+    name: Notify Release Created
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    if: always() && needs.create-release.result == 'success'
+    
+    steps:
+      - name: Success notification
+        run: |
+          echo "🎉 Release ${{ needs.create-release.outputs.release_tag }} has been created!"
+          echo "📦 Production build will be triggered automatically by the release tag"
+          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.create-release.outputs.release_tag }}"

@@ -2,11 +2,54 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop, epic/* ]
+    branches: [ main, "feature/*", "hotfix/*", "epic/*" ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 jobs:
+  validate-branch:
+    name: Validate Branch Name  
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check branch naming convention
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          echo "Validating branch: $BRANCH_NAME"
+          
+          # Check if branch follows pattern: (feature|hotfix|epic)/123-description
+          if [[ ! "$BRANCH_NAME" =~ ^(feature|hotfix|epic)/[0-9]+-[a-zA-Z0-9._-]+$ ]]; then
+            echo "❌ Branch name must follow pattern: (feature|hotfix|epic)/#-description"
+            echo "   Example: feature/123-add-new-feature"
+            echo "   Your branch: $BRANCH_NAME"
+            exit 1
+          fi
+          
+          echo "✅ Branch name follows convention"
+
+  validate-pr-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest  
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check PR title for issue reference
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          BRANCH_NAME="${{ github.head_ref }}"
+          
+          # Extract issue number from branch name
+          ISSUE_NUM=$(echo "$BRANCH_NAME" | sed -n 's/^[^/]*\/\([0-9]\+\)-.*/\1/p')
+          
+          # Check if PR title starts with issue number
+          if [[ ! "$PR_TITLE" =~ ^${ISSUE_NUM}: ]]; then
+            echo "❌ PR title must start with issue number from branch"
+            echo "   Expected format: $ISSUE_NUM: Description"
+            echo "   Your title: $PR_TITLE"
+            exit 1
+          fi
+          
+          echo "✅ PR title includes issue number"
+
   test:
     name: Test
     runs-on: ubuntu-latest

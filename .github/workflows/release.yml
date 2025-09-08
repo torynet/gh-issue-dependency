@@ -1,13 +1,14 @@
-name: Release
+name: Production Release
 
 on:
   push:
     tags:
       - 'v*'
+      - '!v*-rc*'  # Exclude RC tags
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release'
+        description: 'Release tag to build (e.g., v1.2.0)'
         required: true
         default: 'v0.1.0'
 
@@ -81,7 +82,7 @@ jobs:
           BINARY_NAME="gh-issue-dependency-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
           
           go build \
-            -ldflags "-s -w -X cmd.Version=${{ steps.version.outputs.version }} -X cmd.Commit=${GITHUB_SHA:0:8}" \
+            -ldflags "-s -w -X cmd.Version=${{ steps.version.outputs.version }} -X cmd.Commit=${GITHUB_SHA:0:8} -X cmd.BuildType=release" \
             -o "dist/${BINARY_NAME}" \
             .
           
