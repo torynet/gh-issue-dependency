@@ -81,7 +81,7 @@ jobs:
           BINARY_NAME="gh-issue-dependency-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
           
           go build \
-            -ldflags "-s -w -X main.version=${{ steps.version.outputs.version }} -X main.commit=${GITHUB_SHA:0:8}" \
+            -ldflags "-s -w -X cmd.Version=${{ steps.version.outputs.version }} -X cmd.Commit=${GITHUB_SHA:0:8}" \
             -o "dist/${BINARY_NAME}" \
             .
           
