@@ -16,8 +16,8 @@ import (
 
 func TestParseRepoFlag(t *testing.T) {
 	tests := []struct {
-		name     string
-		repoFlag string
+		name      string
+		repoFlag  string
 		wantOwner string
 		wantRepo  string
 		wantErr   bool
@@ -63,12 +63,12 @@ func TestParseRepoFlag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			owner, repo, err := ParseRepoFlag(tt.repoFlag)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseRepoFlag() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr {
 				if owner != tt.wantOwner {
 					t.Errorf("ParseRepoFlag() owner = %v, want %v", owner, tt.wantOwner)
@@ -144,12 +144,12 @@ func TestParseIssueURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			owner, repo, issueNumber, err := ParseIssueURL(tt.url)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseIssueURL() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr {
 				if owner != tt.wantOwner {
 					t.Errorf("ParseIssueURL() owner = %v, want %v", owner, tt.wantOwner)
@@ -307,31 +307,31 @@ func TestExtractRepoFromURL(t *testing.T) {
 
 func TestGetCacheKey(t *testing.T) {
 	tests := []struct {
-		name        string
-		owner       string
-		repo        string
-		issueNumber int
+		name           string
+		owner          string
+		repo           string
+		issueNumber    int
 		expectNonEmpty bool
 	}{
 		{
-			name:        "valid input",
-			owner:       "octocat",
-			repo:        "Hello-World",
-			issueNumber: 123,
+			name:           "valid input",
+			owner:          "octocat",
+			repo:           "Hello-World",
+			issueNumber:    123,
 			expectNonEmpty: true,
 		},
 		{
-			name:        "different issue number",
-			owner:       "octocat",
-			repo:        "Hello-World",
-			issueNumber: 456,
+			name:           "different issue number",
+			owner:          "octocat",
+			repo:           "Hello-World",
+			issueNumber:    456,
 			expectNonEmpty: true,
 		},
 		{
-			name:        "different repo",
-			owner:       "octocat",
-			repo:        "Different-Repo",
-			issueNumber: 123,
+			name:           "different repo",
+			owner:          "octocat",
+			repo:           "Different-Repo",
+			issueNumber:    123,
 			expectNonEmpty: true,
 		},
 	}
@@ -339,20 +339,20 @@ func TestGetCacheKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			key := getCacheKey(tt.owner, tt.repo, tt.issueNumber)
-			
+
 			if tt.expectNonEmpty {
 				assert.NotEmpty(t, key, "cache key should not be empty")
 				assert.Equal(t, 32, len(key), "cache key should be MD5 hash length")
 			}
 		})
 	}
-	
+
 	// Test that different inputs produce different keys
 	key1 := getCacheKey("owner1", "repo1", 123)
 	key2 := getCacheKey("owner2", "repo1", 123)
 	key3 := getCacheKey("owner1", "repo2", 123)
 	key4 := getCacheKey("owner1", "repo1", 456)
-	
+
 	assert.NotEqual(t, key1, key2, "different owners should have different keys")
 	assert.NotEqual(t, key1, key3, "different repos should have different keys")
 	assert.NotEqual(t, key1, key4, "different issue numbers should have different keys")
@@ -363,10 +363,10 @@ func TestCacheOperations(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "gh-issue-dependency-test-cache")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
-	
+
 	// Note: we can't actually change the const CacheDir for testing
 	// In a production system, we'd make getCacheDir() configurable
-	
+
 	testData := &DependencyData{
 		SourceIssue: Issue{
 			Number:     123,
@@ -379,21 +379,21 @@ func TestCacheOperations(t *testing.T) {
 		FetchedAt:  time.Now(),
 		TotalCount: 0,
 	}
-	
+
 	cacheKey := "test-cache-key"
-	
+
 	t.Run("cache miss", func(t *testing.T) {
 		data, found := getFromCache(cacheKey)
 		assert.False(t, found, "cache should miss for non-existent key")
 		assert.Nil(t, data, "data should be nil for cache miss")
 	})
-	
+
 	t.Run("cache save and hit", func(t *testing.T) {
 		// Create cache directory manually since we can't override getCacheDir easily
 		cacheDir := filepath.Join(tempDir, CacheDir)
 		err := os.MkdirAll(cacheDir, 0755)
 		require.NoError(t, err)
-		
+
 		// We can't easily test the actual cache functions without refactoring them
 		// to accept a custom cache directory, but we can test the logic conceptually
 		assert.NotNil(t, testData, "test data should be valid")
@@ -403,12 +403,12 @@ func TestCacheOperations(t *testing.T) {
 // Test repository resolution logic
 func TestResolveRepository(t *testing.T) {
 	tests := []struct {
-		name      string
-		repoFlag  string
-		issueRef  string
-		wantOwner string
-		wantRepo  string
-		wantErr   bool
+		name       string
+		repoFlag   string
+		issueRef   string
+		wantOwner  string
+		wantRepo   string
+		wantErr    bool
 		skipIfNoGH bool
 	}{
 		{
@@ -428,11 +428,11 @@ func TestResolveRepository(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name:      "current repo detection when no URL",
-			repoFlag:  "",
-			issueRef:  "123",
+			name:       "current repo detection when no URL",
+			repoFlag:   "",
+			issueRef:   "123",
 			skipIfNoGH: true, // Skip if gh CLI not available
-			wantErr:   false,
+			wantErr:    false,
 		},
 		{
 			name:     "invalid repo flag format",
@@ -457,14 +457,14 @@ func TestResolveRepository(t *testing.T) {
 					t.Skip("Skipping test that requires gh CLI authentication")
 				}
 			}
-			
+
 			owner, repo, err := ResolveRepository(tt.repoFlag, tt.issueRef)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ResolveRepository() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr && !tt.skipIfNoGH {
 				assert.Equal(t, tt.wantOwner, owner, "owner should match expected")
 				assert.Equal(t, tt.wantRepo, repo, "repo should match expected")
@@ -476,7 +476,7 @@ func TestResolveRepository(t *testing.T) {
 // Test FetchIssueDependencies input validation
 func TestFetchIssueDependenciesValidation(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name        string
 		owner       string
@@ -526,7 +526,7 @@ func TestFetchIssueDependenciesValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			data, err := FetchIssueDependencies(ctx, tt.owner, tt.repo, tt.issueNumber)
-			
+
 			if (err != nil) != tt.wantErr {
 				if tt.skipReason != "" {
 					t.Logf("Test failed as expected: %s", tt.skipReason)
@@ -535,7 +535,7 @@ func TestFetchIssueDependenciesValidation(t *testing.T) {
 				}
 				return
 			}
-			
+
 			if !tt.wantErr {
 				assert.NotNil(t, data, "data should not be nil for successful fetch")
 			}
@@ -587,7 +587,7 @@ func TestDataStructures(t *testing.T) {
 			FetchedAt:  time.Now(),
 			TotalCount: 2,
 		}
-		
+
 		assert.Equal(t, 123, data.SourceIssue.Number)
 		assert.Equal(t, "Test Issue", data.SourceIssue.Title)
 		assert.Equal(t, "open", data.SourceIssue.State)
@@ -602,19 +602,19 @@ func TestDataStructures(t *testing.T) {
 		assert.Equal(t, "blocks", data.Blocking[0].Type)
 		assert.Equal(t, 2, data.TotalCount)
 	})
-	
+
 	t.Run("CacheEntry structure", func(t *testing.T) {
 		data := &DependencyData{
 			SourceIssue: Issue{Number: 123, Title: "Test", State: "open"},
 			FetchedAt:   time.Now(),
 			TotalCount:  0,
 		}
-		
+
 		entry := CacheEntry{
 			Data:      *data,
 			ExpiresAt: time.Now().Add(CacheDuration),
 		}
-		
+
 		assert.Equal(t, data.SourceIssue.Number, entry.Data.SourceIssue.Number)
 		assert.True(t, entry.ExpiresAt.After(time.Now()))
 	})
@@ -650,7 +650,7 @@ func TestErrorHandling(t *testing.T) {
 			{"zero issue", "owner", "repo", 0},
 			{"negative issue", "owner", "repo", -1},
 		}
-		
+
 		ctx := context.Background()
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -659,14 +659,14 @@ func TestErrorHandling(t *testing.T) {
 			})
 		}
 	})
-	
+
 	t.Run("repository parsing errors", func(t *testing.T) {
 		tests := []string{
 			"invalid",
 			"too/many/parts/here",
 			"",
 		}
-		
+
 		for _, repoFlag := range tests {
 			t.Run(fmt.Sprintf("repo flag: %s", repoFlag), func(t *testing.T) {
 				_, _, err := ParseRepoFlag(repoFlag)

@@ -87,13 +87,13 @@ type DependencyRelation struct {
 
 // DependencyData contains all dependency information for an issue
 type DependencyData struct {
-	SourceIssue             Issue                 `json:"source_issue"`
-	BlockedBy               []DependencyRelation  `json:"blocked_by"`
-	Blocking                []DependencyRelation  `json:"blocking"`
-	FetchedAt               time.Time            `json:"fetched_at"`
-	TotalCount              int                  `json:"total_count"`
-	OriginalBlockedByCount  int                  `json:"original_blocked_by_count,omitempty"`
-	OriginalBlockingCount   int                  `json:"original_blocking_count,omitempty"`
+	SourceIssue            Issue                `json:"source_issue"`
+	BlockedBy              []DependencyRelation `json:"blocked_by"`
+	Blocking               []DependencyRelation `json:"blocking"`
+	FetchedAt              time.Time            `json:"fetched_at"`
+	TotalCount             int                  `json:"total_count"`
+	OriginalBlockedByCount int                  `json:"original_blocked_by_count,omitempty"`
+	OriginalBlockingCount  int                  `json:"original_blocking_count,omitempty"`
 }
 
 // CacheEntry represents a cached dependency data entry
@@ -104,7 +104,7 @@ type CacheEntry struct {
 
 // Cache configuration
 const (
-	CacheDir     = ".gh-issue-dependency-cache"
+	CacheDir      = ".gh-issue-dependency-cache"
 	CacheDuration = 5 * time.Minute // Cache for 5 minutes
 )
 
@@ -134,11 +134,11 @@ func GetCurrentRepo() (owner, repo string, err error) {
 			).WithSuggestion("Install GitHub CLI from https://cli.github.com/").
 				WithSuggestion("Ensure 'gh' is in your PATH")
 		}
-		
+
 		if isAuthError(err) {
 			return "", "", WrapAuthError(err)
 		}
-		
+
 		return "", "", NewRepositoryNotFoundError("current directory").
 			WithSuggestion("Run this command from within a GitHub repository").
 			WithSuggestion("Use the --repo flag to specify a repository explicitly")
@@ -151,7 +151,7 @@ func GetCurrentRepo() (owner, repo string, err error) {
 		} `json:"owner"`
 		Name string `json:"name"`
 	}
-	
+
 	if err := json.Unmarshal(output, &repoData); err != nil {
 		return "", "", WrapInternalError("parsing repository information", err)
 	}
@@ -198,7 +198,7 @@ func ParseIssueURL(url string) (owner, repo string, issueNumber int, err error) 
 	// GitHub issue URL pattern: https://github.com/owner/repo/issues/123
 	githubIssuePattern := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)(?:[/?#].*)?$`)
 	matches := githubIssuePattern.FindStringSubmatch(url)
-	
+
 	if matches == nil {
 		return "", "", 0, NewIssueNumberValidationError(url).
 			WithSuggestion("Use a GitHub issue URL (e.g., https://github.com/owner/repo/issues/123)")
@@ -232,11 +232,11 @@ func ValidateRepoAccess(owner, repo string) error {
 				err,
 			).WithSuggestion("Install GitHub CLI from https://cli.github.com/")
 		}
-		
+
 		if isAuthError(err) {
 			return WrapAuthError(err)
 		}
-		
+
 		// Check for specific error patterns
 		errMsg := strings.ToLower(err.Error())
 		if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "404") {
@@ -245,7 +245,7 @@ func ValidateRepoAccess(owner, repo string) error {
 		if strings.Contains(errMsg, "forbidden") || strings.Contains(errMsg, "403") {
 			return WrapPermissionError(repoName, err)
 		}
-		
+
 		return NewRepositoryAccessError(repoName, err)
 	}
 
@@ -258,7 +258,7 @@ func ValidateRepoAccess(owner, repo string) error {
 	}
 
 	if repoData.ID == "" {
-		return NewRepositoryAccessError(repoName, 
+		return NewRepositoryAccessError(repoName,
 			fmt.Errorf("repository validation returned empty ID"))
 	}
 
@@ -267,7 +267,7 @@ func ValidateRepoAccess(owner, repo string) error {
 
 // ResolveRepository resolves repository context using the priority order:
 // 1. --repo flag (if provided)
-// 2. Issue URL parsing (if issue is URL)  
+// 2. Issue URL parsing (if issue is URL)
 // 3. Current repository detection via `gh repo view`
 // 4. Error if no context available
 func ResolveRepository(repoFlag, issueRef string) (owner, repo string, err error) {
@@ -320,8 +320,8 @@ func isGhNotFound(err error) bool {
 	}
 	errMsg := strings.ToLower(err.Error())
 	return strings.Contains(errMsg, "executable file not found") ||
-		   strings.Contains(errMsg, "command not found") ||
-		   strings.Contains(errMsg, "not recognized as an internal")
+		strings.Contains(errMsg, "command not found") ||
+		strings.Contains(errMsg, "not recognized as an internal")
 }
 
 // isAuthError checks if the error indicates authentication issues
@@ -331,9 +331,9 @@ func isAuthError(err error) bool {
 	}
 	errMsg := strings.ToLower(err.Error())
 	return strings.Contains(errMsg, "authentication") ||
-		   strings.Contains(errMsg, "unauthorized") ||
-		   strings.Contains(errMsg, "to authenticate") ||
-		   strings.Contains(errMsg, "gh auth login")
+		strings.Contains(errMsg, "unauthorized") ||
+		strings.Contains(errMsg, "to authenticate") ||
+		strings.Contains(errMsg, "gh auth login")
 }
 
 // SetupGitHubClient sets up a GitHub API client using gh CLI's authentication
@@ -349,7 +349,7 @@ func SetupGitHubClient() error {
 			).WithSuggestion("Install GitHub CLI from https://cli.github.com/").
 				WithSuggestion("Ensure 'gh' is in your PATH")
 		}
-		
+
 		return WrapAuthError(err).
 			WithSuggestion("Run 'gh auth login' to authenticate with GitHub")
 	}
@@ -367,7 +367,7 @@ func SetupGitHubClient() error {
 func fetchIssueDetails(ctx context.Context, client *api.RESTClient, owner, repo string, issueNumber int) (*Issue, error) {
 	// API endpoint for issue details
 	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d", owner, repo, issueNumber)
-	
+
 	var issue Issue
 	err := client.Get(endpoint, &issue)
 	if err != nil {
@@ -384,17 +384,19 @@ func fetchIssueDetails(ctx context.Context, client *api.RESTClient, owner, repo 
 		if strings.Contains(strings.ToLower(err.Error()), "rate limit") {
 			return nil, WrapAPIError(429, err)
 		}
-		
+
 		return nil, WrapInternalError("fetching issue details", err)
 	}
-	
+
 	// Add repository information for cross-repo support
 	issue.Repository = RepositoryInfo{
 		Name:     repo,
 		FullName: fmt.Sprintf("%s/%s", owner, repo),
-		Owner:    struct{ Login string `json:"login"` }{Login: owner},
+		Owner: struct {
+			Login string `json:"login"`
+		}{Login: owner},
 	}
-	
+
 	return &issue, nil
 }
 
@@ -402,10 +404,10 @@ func fetchIssueDetails(ctx context.Context, client *api.RESTClient, owner, repo 
 func fetchDependencyRelationships(ctx context.Context, client *api.RESTClient, owner, repo string, issueNumber int, relationType string) ([]DependencyRelation, error) {
 	// API endpoint for dependency relationships
 	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s", owner, repo, issueNumber, relationType)
-	
+
 	// Use generic interface to handle GitHub's API response format
 	var rawData interface{}
-	
+
 	err := client.Get(endpoint, &rawData)
 	if err != nil {
 		// Handle specific error types
@@ -422,10 +424,10 @@ func fetchDependencyRelationships(ctx context.Context, client *api.RESTClient, o
 		if strings.Contains(strings.ToLower(err.Error()), "rate limit") {
 			return nil, WrapAPIError(429, err)
 		}
-		
+
 		return nil, WrapInternalError(fmt.Sprintf("fetching %s dependencies", relationType), err)
 	}
-	
+
 	// Now parse the data into our Issue structs
 	var relations []Issue
 	if rawDataBytes, err := json.Marshal(rawData); err == nil {
@@ -433,7 +435,7 @@ func fetchDependencyRelationships(ctx context.Context, client *api.RESTClient, o
 			return nil, WrapInternalError(fmt.Sprintf("parsing %s dependencies", relationType), err)
 		}
 	}
-	
+
 	// Transform to DependencyRelation objects
 	var dependencies []DependencyRelation
 	for _, rel := range relations {
@@ -441,7 +443,7 @@ func fetchDependencyRelationships(ctx context.Context, client *api.RESTClient, o
 		if rel.Number == 0 {
 			continue // Skip zero-value issues that indicate unmarshaling problems
 		}
-		
+
 		// Extract repository name - use the repository field if available, otherwise use the current repo
 		repoName := fmt.Sprintf("%s/%s", owner, repo) // Default to current repo
 		if rel.Repository.FullName != "" {
@@ -452,14 +454,14 @@ func fetchDependencyRelationships(ctx context.Context, client *api.RESTClient, o
 				repoName = repoFromURL
 			}
 		}
-		
+
 		dependencies = append(dependencies, DependencyRelation{
 			Issue:      rel,
 			Type:       relationType,
 			Repository: repoName,
 		})
 	}
-	
+
 	return dependencies, nil
 }
 
@@ -469,12 +471,12 @@ func extractRepoFromURL(url string) string {
 	if !strings.HasPrefix(url, "https://github.com/") {
 		return ""
 	}
-	
+
 	parts := strings.Split(strings.TrimPrefix(url, "https://github.com/"), "/")
 	if len(parts) < 2 {
 		return ""
 	}
-	
+
 	return parts[0] + "/" + parts[1]
 }
 
@@ -485,11 +487,11 @@ func fetchDependencies(ctx context.Context, owner, repo string, issueNumber int)
 	if err != nil {
 		return nil, WrapInternalError("creating GitHub API client", err)
 	}
-	
+
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	
+
 	// Channel for collecting results
 	type fetchResult struct {
 		sourceIssue *Issue
@@ -497,10 +499,10 @@ func fetchDependencies(ctx context.Context, owner, repo string, issueNumber int)
 		blocking    []DependencyRelation
 		err         error
 	}
-	
+
 	resultChan := make(chan fetchResult, 3)
 	var wg sync.WaitGroup
-	
+
 	// Fetch source issue details
 	wg.Add(1)
 	go func() {
@@ -508,7 +510,7 @@ func fetchDependencies(ctx context.Context, owner, repo string, issueNumber int)
 		issue, err := fetchIssueDetails(ctx, client, owner, repo, issueNumber)
 		resultChan <- fetchResult{sourceIssue: issue, err: err}
 	}()
-	
+
 	// Fetch blocked_by relationships
 	wg.Add(1)
 	go func() {
@@ -516,28 +518,28 @@ func fetchDependencies(ctx context.Context, owner, repo string, issueNumber int)
 		relations, err := fetchDependencyRelationships(ctx, client, owner, repo, issueNumber, "blocked_by")
 		resultChan <- fetchResult{blockedBy: relations, err: err}
 	}()
-	
-	// Fetch blocking relationships  
+
+	// Fetch blocking relationships
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		relations, err := fetchDependencyRelationships(ctx, client, owner, repo, issueNumber, "blocking")
 		resultChan <- fetchResult{blocking: relations, err: err}
 	}()
-	
+
 	// Wait for all goroutines to complete
 	wg.Wait()
 	close(resultChan)
-	
+
 	// Collect results
 	var data DependencyData
 	data.FetchedAt = time.Now()
-	
+
 	for result := range resultChan {
 		if result.err != nil {
 			return nil, result.err
 		}
-		
+
 		if result.sourceIssue != nil {
 			data.SourceIssue = *result.sourceIssue
 		}
@@ -548,10 +550,10 @@ func fetchDependencies(ctx context.Context, owner, repo string, issueNumber int)
 			data.Blocking = result.blocking
 		}
 	}
-	
+
 	// Calculate total count
 	data.TotalCount = len(data.BlockedBy) + len(data.Blocking)
-	
+
 	return &data, nil
 }
 
@@ -564,32 +566,32 @@ func FetchIssueDependencies(ctx context.Context, owner, repo string, issueNumber
 	if issueNumber <= 0 {
 		return nil, NewIssueNumberValidationError(strconv.Itoa(issueNumber))
 	}
-	
+
 	// Try to get from cache first
 	cacheKey := getCacheKey(owner, repo, issueNumber)
 	if data, found := getFromCache(cacheKey); found {
 		return data, nil
 	}
-	
+
 	// Verify GitHub CLI authentication
 	if err := SetupGitHubClient(); err != nil {
 		return nil, err
 	}
-	
+
 	// Validate repository access
 	if err := ValidateRepoAccess(owner, repo); err != nil {
 		return nil, err
 	}
-	
+
 	// Fetch dependency data
 	data, err := fetchDependencies(ctx, owner, repo, issueNumber)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Cache the result
 	saveToCache(cacheKey, data)
-	
+
 	return data, nil
 }
 
@@ -613,55 +615,55 @@ func getCacheDir() string {
 func getFromCache(key string) (*DependencyData, bool) {
 	cacheDir := getCacheDir()
 	cachePath := filepath.Join(cacheDir, key+".json")
-	
+
 	// Check if cache file exists
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		return nil, false
 	}
-	
+
 	// Read cache file
 	data, err := os.ReadFile(cachePath)
 	if err != nil {
 		return nil, false
 	}
-	
+
 	// Parse cache entry
 	var entry CacheEntry
 	if err := json.Unmarshal(data, &entry); err != nil {
 		return nil, false
 	}
-	
+
 	// Check if cache entry has expired
 	if time.Now().After(entry.ExpiresAt) {
 		// Remove expired cache file
 		os.Remove(cachePath)
 		return nil, false
 	}
-	
+
 	return &entry.Data, true
 }
 
 // saveToCache stores data in cache
 func saveToCache(key string, data *DependencyData) {
 	cacheDir := getCacheDir()
-	
+
 	// Create cache directory if it doesn't exist
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return // fail silently
 	}
-	
+
 	// Create cache entry
 	entry := CacheEntry{
 		Data:      *data,
 		ExpiresAt: time.Now().Add(CacheDuration),
 	}
-	
+
 	// Marshal to JSON
 	jsonData, err := json.Marshal(entry)
 	if err != nil {
 		return // fail silently
 	}
-	
+
 	// Write to cache file
 	cachePath := filepath.Join(cacheDir, key+".json")
 	os.WriteFile(cachePath, jsonData, 0644)
@@ -670,32 +672,32 @@ func saveToCache(key string, data *DependencyData) {
 // CleanExpiredCache removes expired cache entries
 func CleanExpiredCache() error {
 	cacheDir := getCacheDir()
-	
+
 	// Check if cache directory exists
 	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
 		return nil // no cache to clean
 	}
-	
+
 	// Read cache directory
 	files, err := os.ReadDir(cacheDir)
 	if err != nil {
 		return err
 	}
-	
+
 	now := time.Now()
 	for _, file := range files {
 		if !strings.HasSuffix(file.Name(), ".json") {
 			continue
 		}
-		
+
 		cachePath := filepath.Join(cacheDir, file.Name())
-		
+
 		// Read cache file
 		data, err := os.ReadFile(cachePath)
 		if err != nil {
 			continue
 		}
-		
+
 		// Parse cache entry
 		var entry CacheEntry
 		if err := json.Unmarshal(data, &entry); err != nil {
@@ -703,16 +705,14 @@ func CleanExpiredCache() error {
 			os.Remove(cachePath)
 			continue
 		}
-		
+
 		// Remove expired entries
 		if now.After(entry.ExpiresAt) {
 			os.Remove(cachePath)
 		}
 	}
-	
+
 	return nil
-<<<<<<< HEAD
-=======
 }
 
 // GitHub API Integration for Dependency Removal
@@ -861,7 +861,7 @@ func (r *DependencyRemover) deleteRelationship(source, target IssueRef, relType 
 	}
 
 	// Construct the DELETE endpoint
-	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s", 
+	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s",
 		source.Owner, source.Repo, source.Number, relationshipID)
 
 	// Execute DELETE request
@@ -946,7 +946,7 @@ func (r *DependencyRemover) handleDeleteError(err error, source, target IssueRef
 	if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "404") {
 		return NewAppError(
 			ErrorTypeIssue,
-			fmt.Sprintf("Dependency relationship no longer exists: %s %s %s", 
+			fmt.Sprintf("Dependency relationship no longer exists: %s %s %s",
 				source.String(), relType, target.String()),
 			err,
 		).WithSuggestion("The relationship may have been removed by another process")
@@ -981,9 +981,9 @@ func (r *DependencyRemover) isRetryableError(err error) bool {
 		// Rate limits and server errors are retryable
 		errMsg := strings.ToLower(err.Error())
 		return strings.Contains(errMsg, "rate limit") ||
-		       strings.Contains(errMsg, "500") ||
-		       strings.Contains(errMsg, "502") ||
-		       strings.Contains(errMsg, "503")
+			strings.Contains(errMsg, "500") ||
+			strings.Contains(errMsg, "502") ||
+			strings.Contains(errMsg, "503")
 	}
 
 	return false
@@ -1007,7 +1007,7 @@ func (r *DependencyRemover) executeBatchDeletion(source IssueRef, targets []Issu
 	if len(errors) > 0 {
 		return NewAppError(
 			ErrorTypeAPI,
-			fmt.Sprintf("Batch removal partially failed: %d succeeded, %d failed", 
+			fmt.Sprintf("Batch removal partially failed: %d succeeded, %d failed",
 				successCount, len(errors)),
 			nil,
 		).WithContext("errors", strings.Join(errors, "; ")).WithSuggestion(
@@ -1025,7 +1025,7 @@ func (r *DependencyRemover) executeBatchDeletion(source IssueRef, targets []Issu
 // showDryRunPreview displays what would be removed in dry run mode
 func (r *DependencyRemover) showDryRunPreview(source, target IssueRef, relType string) error {
 	fmt.Printf("Dry run: dependency removal preview\n\n")
-	
+
 	var relationshipDescription string
 	switch relType {
 	case "blocked-by":
@@ -1033,11 +1033,11 @@ func (r *DependencyRemover) showDryRunPreview(source, target IssueRef, relType s
 	case "blocks":
 		relationshipDescription = fmt.Sprintf("blocks relationship: %s → %s", source.String(), target.String())
 	}
-	
+
 	fmt.Printf("Would remove:\n")
 	fmt.Printf("  ❌ %s\n", relationshipDescription)
 	fmt.Printf("\nNo changes made. Use --force to skip confirmation or remove --dry-run to execute.\n")
-	
+
 	return nil
 }
 
@@ -1045,7 +1045,7 @@ func (r *DependencyRemover) showDryRunPreview(source, target IssueRef, relType s
 func (r *DependencyRemover) showBatchDryRunPreview(source IssueRef, targets []IssueRef, relType string) error {
 	fmt.Printf("Dry run: batch dependency removal preview\n\n")
 	fmt.Printf("Would remove %d relationships:\n", len(targets))
-	
+
 	for _, target := range targets {
 		var relationshipDescription string
 		switch relType {
@@ -1056,9 +1056,9 @@ func (r *DependencyRemover) showBatchDryRunPreview(source IssueRef, targets []Is
 		}
 		fmt.Printf("  ❌ %s\n", relationshipDescription)
 	}
-	
+
 	fmt.Printf("\nNo changes made. Use --force to skip confirmation or remove --dry-run to execute.\n")
-	
+
 	return nil
 }
 
@@ -1067,24 +1067,24 @@ func (r *DependencyRemover) requestConfirmation(source, target IssueRef, relType
 	// Get issue details for better confirmation prompt
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	sourceIssue, err := fetchIssueDetails(ctx, r.client, source.Owner, source.Repo, source.Number)
 	if err != nil {
 		// Fall back to basic confirmation if we can't get details
 		return r.requestBasicConfirmation(source, target, relType)
 	}
-	
+
 	targetIssue, err := fetchIssueDetails(ctx, r.client, target.Owner, target.Repo, target.Number)
 	if err != nil {
 		// Fall back to basic confirmation if we can't get details
 		return r.requestBasicConfirmation(source, target, relType)
 	}
-	
+
 	fmt.Printf("Remove dependency relationship?\n")
 	fmt.Printf("  Source: %s - %s\n", source.String(), sourceIssue.Title)
 	fmt.Printf("  Target: %s - %s\n", target.String(), targetIssue.Title)
 	fmt.Printf("  Type: %s\n\n", relType)
-	
+
 	var relationshipDescription string
 	switch relType {
 	case "blocked-by":
@@ -1092,13 +1092,13 @@ func (r *DependencyRemover) requestConfirmation(source, target IssueRef, relType
 	case "blocks":
 		relationshipDescription = fmt.Sprintf("This will remove the \"%s\" relationship between these issues.", relType)
 	}
-	
+
 	fmt.Printf("%s\n", relationshipDescription)
 	fmt.Printf("Continue? (y/N): ")
-	
+
 	var response string
 	fmt.Scanln(&response)
-	
+
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes", nil
 }
@@ -1107,10 +1107,10 @@ func (r *DependencyRemover) requestConfirmation(source, target IssueRef, relType
 func (r *DependencyRemover) requestBasicConfirmation(source, target IssueRef, relType string) (bool, error) {
 	fmt.Printf("Remove %s dependency relationship between %s and %s?\n", relType, source.String(), target.String())
 	fmt.Printf("Continue? (y/N): ")
-	
+
 	var response string
 	fmt.Scanln(&response)
-	
+
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes", nil
 }
@@ -1121,17 +1121,17 @@ func (r *DependencyRemover) requestBatchConfirmation(source IssueRef, targets []
 	fmt.Printf("  Source: %s\n", source.String())
 	fmt.Printf("  Type: %s\n", relType)
 	fmt.Printf("  Targets:\n")
-	
+
 	for _, target := range targets {
 		fmt.Printf("    - %s\n", target.String())
 	}
-	
+
 	fmt.Printf("\nThis will remove %d dependency relationships.\n", len(targets))
 	fmt.Printf("Continue? (y/N): ")
-	
+
 	var response string
 	fmt.Scanln(&response)
-	
+
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes", nil
 }
@@ -1145,11 +1145,11 @@ func (r *DependencyRemover) showSuccessMessage(source, target IssueRef, relType 
 	case "blocks":
 		relationshipSymbol = "→"
 	}
-	
-	fmt.Printf("✅ Removed %s relationship: %s %s %s\n\n", 
+
+	fmt.Printf("✅ Removed %s relationship: %s %s %s\n\n",
 		relType, source.String(), relationshipSymbol, target.String())
 	fmt.Printf("Dependency removed successfully.\n")
-	
+
 	return nil
 }
 
@@ -1162,13 +1162,13 @@ func (r *DependencyRemover) showBatchSuccessMessage(source IssueRef, targets []I
 	case "blocks":
 		relationshipSymbol = "→"
 	}
-	
+
 	fmt.Printf("✅ Removed %d %s relationships:\n", len(targets), relType)
 	for _, target := range targets {
 		fmt.Printf("  %s %s %s\n", source.String(), relationshipSymbol, target.String())
 	}
 	fmt.Printf("\nBatch dependency removal completed successfully.\n")
-	
+
 	return nil
 }
 
@@ -1183,7 +1183,7 @@ func (r *DependencyRemover) RemoveCrossRepositoryRelationship(source, target Iss
 	if err := r.validateCrossRepositoryPermissions(source, target); err != nil {
 		return fmt.Errorf("cross-repository validation failed: %w", err)
 	}
-	
+
 	// Use the standard removal process
 	return r.RemoveRelationship(source, target, relType, opts)
 }
@@ -1194,14 +1194,14 @@ func (r *DependencyRemover) validateCrossRepositoryPermissions(source, target Is
 	if err := ValidateRepoAccess(source.Owner, source.Repo); err != nil {
 		return fmt.Errorf("source repository access failed: %w", err)
 	}
-	
+
 	// Validate target repository permissions (for cross-repo dependencies)
 	if source.Owner != target.Owner || source.Repo != target.Repo {
 		if err := ValidateRepoAccess(target.Owner, target.Repo); err != nil {
 			return fmt.Errorf("target repository access failed: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1210,12 +1210,12 @@ func (r *DependencyRemover) RemoveAllRelationships(issue IssueRef, opts RemoveOp
 	// Get current dependencies
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	dependencies, err := r.validator.fetchIssueDependencies(ctx, issue)
 	if err != nil {
 		return fmt.Errorf("failed to fetch dependencies for removal: %w", err)
 	}
-	
+
 	if len(dependencies.BlockedBy) == 0 && len(dependencies.Blocking) == 0 {
 		return NewAppError(
 			ErrorTypeIssue,
@@ -1223,40 +1223,40 @@ func (r *DependencyRemover) RemoveAllRelationships(issue IssueRef, opts RemoveOp
 			nil,
 		).WithSuggestion("Use 'gh issue-dependency list' to see current dependencies")
 	}
-	
+
 	// Collect all targets
 	var blockedByTargets []IssueRef
 	var blockingTargets []IssueRef
-	
+
 	for _, relation := range dependencies.BlockedBy {
 		target := r.dependencyRelationToIssueRef(relation)
 		blockedByTargets = append(blockedByTargets, target)
 	}
-	
+
 	for _, relation := range dependencies.Blocking {
 		target := r.dependencyRelationToIssueRef(relation)
 		blockingTargets = append(blockingTargets, target)
 	}
-	
+
 	// Remove blocked-by relationships
 	if len(blockedByTargets) > 0 {
 		if err := r.RemoveBatchRelationships(issue, blockedByTargets, "blocked-by", opts); err != nil {
 			return fmt.Errorf("failed to remove blocked-by relationships: %w", err)
 		}
 	}
-	
+
 	// Remove blocking relationships
 	if len(blockingTargets) > 0 {
 		if err := r.RemoveBatchRelationships(issue, blockingTargets, "blocks", opts); err != nil {
 			return fmt.Errorf("failed to remove blocks relationships: %w", err)
 		}
 	}
-	
+
 	fmt.Printf("✅ Removed all dependency relationships for %s\n", issue.String())
 	fmt.Printf("  - %d blocked-by relationships removed\n", len(blockedByTargets))
 	fmt.Printf("  - %d blocks relationships removed\n\n", len(blockingTargets))
 	fmt.Printf("All dependencies cleared successfully.\n")
-	
+
 	return nil
 }
 
@@ -1273,19 +1273,18 @@ func (r *DependencyRemover) dependencyRelationToIssueRef(relation DependencyRela
 			repoParts = []string{"", ""}
 		}
 	}
-	
+
 	owner := ""
 	repo := ""
 	if len(repoParts) == 2 {
 		owner = repoParts[0]
 		repo = repoParts[1]
 	}
-	
+
 	return IssueRef{
 		Owner:    owner,
 		Repo:     repo,
 		Number:   relation.Issue.Number,
 		FullName: relation.Repository,
 	}
->>>>>>> epic/dependency-remove
 }

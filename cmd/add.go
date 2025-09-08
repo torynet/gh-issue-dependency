@@ -19,8 +19,8 @@ You must specify exactly one of the following relationship types:
 
   --blocked-by   The specified issue is blocked by other issues
                  (those issues must be completed first)
-                 
-  --blocks       The specified issue blocks other issues  
+
+  --blocks       The specified issue blocks other issues
                  (this issue must be completed before those issues)
 
 ISSUE REFERENCES
@@ -71,7 +71,7 @@ FLAGS
 			).WithSuggestion("Use --blocked-by to specify issues that block this one").
 				WithSuggestion("Use --blocks to specify issues that this one blocks")
 		}
-		
+
 		if addBlockedBy != "" && addBlocks != "" {
 			return pkg.NewAppError(
 				pkg.ErrorTypeValidation,
@@ -103,7 +103,7 @@ FLAGS
 		// TODO: Implement add functionality
 		if addBlockedBy != "" {
 			return pkg.WrapInternalError(
-				"adding blocked-by dependencies", 
+				"adding blocked-by dependencies",
 				fmt.Errorf("add command not implemented yet: issue %d blocked by %s", issueNum, addBlockedBy),
 			).WithSuggestion("This feature is currently under development")
 		} else {
@@ -120,7 +120,7 @@ var (
 	// addBlockedBy contains a comma-separated list of issue references that block
 	// the target issue. These issues must be completed before the target can be worked on.
 	addBlockedBy string
-	
+
 	// addBlocks contains a comma-separated list of issue references that are blocked
 	// by the target issue. The target must be completed before these can be worked on.
 	addBlocks string

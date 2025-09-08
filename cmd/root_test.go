@@ -43,26 +43,26 @@ func TestRootCmd(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a new root command for each test to avoid flag pollution
 			cmd := createTestRootCmd()
-			
+
 			// Capture output
 			outBuf := &bytes.Buffer{}
 			errBuf := &bytes.Buffer{}
 			cmd.SetOut(outBuf)
 			cmd.SetErr(errBuf)
-			
+
 			// Set args
 			cmd.SetArgs(tt.args)
-			
+
 			// Execute command
 			err := cmd.Execute()
-			
+
 			// Check exit code
 			if tt.wantCode == 0 {
 				assert.NoError(t, err, "command should succeed")
 			} else {
 				assert.Error(t, err, "command should fail")
 			}
-			
+
 			// Check output
 			if tt.wantOut != "" {
 				output := outBuf.String()
@@ -72,7 +72,7 @@ func TestRootCmd(t *testing.T) {
 				}
 				assert.Contains(t, output, tt.wantOut, "output should contain expected text")
 			}
-			
+
 			// Check error output
 			if tt.wantErr != "" {
 				assert.Contains(t, errBuf.String(), tt.wantErr, "error output should contain expected text")
@@ -83,13 +83,13 @@ func TestRootCmd(t *testing.T) {
 
 func TestRootCmdConfiguration(t *testing.T) {
 	cmd := createTestRootCmd()
-	
+
 	// Test command configuration
 	assert.Equal(t, "gh-issue-dependency", cmd.Use)
 	assert.Equal(t, "Manage issue dependencies in GitHub repositories", cmd.Short)
 	assert.Contains(t, cmd.Long, "A GitHub CLI extension for managing issue dependencies")
 	assert.Equal(t, Version, cmd.Version)
-	
+
 	// Test that examples are included
 	assert.Contains(t, cmd.Long, "Examples:")
 	assert.Contains(t, cmd.Long, "gh issue-dependency list")
@@ -99,7 +99,7 @@ func TestRootCmdConfiguration(t *testing.T) {
 
 func TestRootCmdFlags(t *testing.T) {
 	cmd := createTestRootCmd()
-	
+
 	// Test global --repo flag
 	repoFlag := cmd.PersistentFlags().Lookup("repo")
 	require.NotNil(t, repoFlag, "repo flag should exist")
@@ -110,15 +110,15 @@ func TestRootCmdFlags(t *testing.T) {
 
 func TestVersionTemplate(t *testing.T) {
 	cmd := createTestRootCmd()
-	
+
 	// Capture version output
 	outBuf := &bytes.Buffer{}
 	cmd.SetOut(outBuf)
 	cmd.SetArgs([]string{"--version"})
-	
+
 	err := cmd.Execute()
 	assert.NoError(t, err)
-	
+
 	output := outBuf.String()
 	assert.Contains(t, output, "gh-issue-dependency version")
 	assert.Contains(t, output, Version)
@@ -150,10 +150,10 @@ func TestExecuteFunction(t *testing.T) {
 			// Save original rootCmd
 			originalRootCmd := rootCmd
 			defer func() { rootCmd = originalRootCmd }()
-			
+
 			// Replace rootCmd with mock
 			rootCmd = tt.mockCmd()
-			
+
 			// Test Execute function
 			code := Execute()
 			assert.Equal(t, tt.wantCode, code)
@@ -163,18 +163,18 @@ func TestExecuteFunction(t *testing.T) {
 
 func TestRootCmdSubcommands(t *testing.T) {
 	cmd := createTestRootCmd()
-	
+
 	// Test that subcommands can be added (this tests the structure)
 	addCmd := &cobra.Command{Use: "add"}
-	listCmd := &cobra.Command{Use: "list"}  
+	listCmd := &cobra.Command{Use: "list"}
 	removeCmd := &cobra.Command{Use: "remove"}
-	
+
 	cmd.AddCommand(addCmd, listCmd, removeCmd)
-	
+
 	// Verify subcommands are registered
 	commands := cmd.Commands()
 	assert.Len(t, commands, 3, "should have 3 subcommands")
-	
+
 	commandNames := make([]string, len(commands))
 	for i, c := range commands {
 		commandNames[i] = c.Use
@@ -217,20 +217,20 @@ func TestGlobalRepoFlag(t *testing.T) {
 			if tt.afterTest != nil {
 				defer tt.afterTest()
 			}
-			
+
 			// Reset repoFlag to default
 			repoFlag = ""
-			
+
 			cmd := createTestRootCmd()
 			cmd.SetArgs(tt.args)
-			
+
 			// Capture output to prevent it from showing during tests
 			outBuf := &bytes.Buffer{}
 			cmd.SetOut(outBuf)
-			
+
 			err := cmd.Execute()
 			assert.NoError(t, err)
-			
+
 			assert.Equal(t, tt.wantRepo, repoFlag, "repoFlag should be set correctly")
 		})
 	}
@@ -238,17 +238,17 @@ func TestGlobalRepoFlag(t *testing.T) {
 
 func TestRootCmdUsageFormatting(t *testing.T) {
 	cmd := createTestRootCmd()
-	
+
 	// Capture help output
 	outBuf := &bytes.Buffer{}
 	cmd.SetOut(outBuf)
 	cmd.SetArgs([]string{"--help"})
-	
+
 	err := cmd.Execute()
 	assert.NoError(t, err)
-	
+
 	output := outBuf.String()
-	
+
 	// Test help formatting
 	assert.Contains(t, output, "Usage:")
 	assert.Contains(t, output, "Flags:")
@@ -282,13 +282,13 @@ Examples:
 			cmd.Help()
 		},
 	}
-	
+
 	// Add persistent flags
 	cmd.PersistentFlags().StringVarP(&repoFlag, "repo", "R", "", "Select another repository using the [HOST/]OWNER/REPO format")
-	
+
 	// Set version template
 	cmd.SetVersionTemplate("gh-issue-dependency version {{.Version}}\n")
-	
+
 	return cmd
 }
 
@@ -300,9 +300,9 @@ func TestInit(t *testing.T) {
 // Test with environment variables
 func TestRootCmdWithEnvVars(t *testing.T) {
 	// Save original env
-	originalGHToken := os.Getenv("GH_TOKEN") 
+	originalGHToken := os.Getenv("GH_TOKEN")
 	originalGHRepo := os.Getenv("GH_REPO")
-	
+
 	defer func() {
 		if originalGHToken != "" {
 			os.Setenv("GH_TOKEN", originalGHToken)
@@ -315,21 +315,21 @@ func TestRootCmdWithEnvVars(t *testing.T) {
 			os.Unsetenv("GH_REPO")
 		}
 	}()
-	
+
 	// Set test environment
 	os.Setenv("GH_TOKEN", "test-token")
 	os.Setenv("GH_REPO", "test-owner/test-repo")
-	
+
 	cmd := createTestRootCmd()
 	cmd.SetArgs([]string{"--help"})
-	
+
 	// Capture output
 	outBuf := &bytes.Buffer{}
 	cmd.SetOut(outBuf)
-	
+
 	err := cmd.Execute()
 	assert.NoError(t, err)
-	
+
 	// Command should still work with env vars present
 	assert.Contains(t, outBuf.String(), "gh-issue-dependency")
 }

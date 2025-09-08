@@ -13,19 +13,19 @@ func TestIntegrationWorkflow(t *testing.T) {
 	t.Run("ValidationIntegration", func(t *testing.T) {
 		// Test that RemovalValidator can be created (structure validation)
 		// In a real environment, this would require GitHub CLI authentication
-		
+
 		source := CreateIssueRef("owner", "repo", 123)
 		target := CreateIssueRef("owner", "repo", 456)
-		
+
 		// Test input validation
 		if source.String() != "owner/repo#123" {
 			t.Error("Source IssueRef not formatted correctly")
 		}
-		
+
 		if target.String() != "owner/repo#456" {
 			t.Error("Target IssueRef not formatted correctly")
 		}
-		
+
 		t.Log("✅ Issue reference formatting works correctly")
 	})
 
@@ -48,7 +48,7 @@ func TestIntegrationWorkflow(t *testing.T) {
 		if defaultOpts.DryRun || defaultOpts.Force {
 			t.Error("Default options should be false for both DryRun and Force")
 		}
-		
+
 		t.Log("✅ Remove options configuration works correctly")
 	})
 
@@ -75,7 +75,7 @@ func TestIntegrationWorkflow(t *testing.T) {
 		if !IsErrorType(testErr, ErrorTypeValidation) {
 			t.Error("Error type checking not working correctly")
 		}
-		
+
 		t.Log("✅ Error type integration works correctly")
 	})
 
@@ -104,7 +104,7 @@ func TestIntegrationWorkflow(t *testing.T) {
 		if !crossRepoDetected {
 			t.Error("Cross-repository relationship not detected in test data")
 		}
-		
+
 		t.Log("✅ Batch operation structure works correctly")
 	})
 
@@ -112,10 +112,10 @@ func TestIntegrationWorkflow(t *testing.T) {
 	t.Run("ValidationErrorScenarios", func(t *testing.T) {
 		// Test self-reference detection
 		selfRef := CreateIssueRef("owner", "repo", 123)
-		
+
 		// In real validation, this would be caught by ValidateRemoval
-		if selfRef.Owner == selfRef.Owner && selfRef.Repo == selfRef.Repo && 
-		   selfRef.Number == selfRef.Number {
+		if selfRef.Owner == selfRef.Owner && selfRef.Repo == selfRef.Repo &&
+			selfRef.Number == selfRef.Number {
 			t.Log("✅ Self-reference detection logic available")
 		}
 
@@ -124,7 +124,7 @@ func TestIntegrationWorkflow(t *testing.T) {
 		if emptyRef.Owner != "" || emptyRef.Repo != "" || emptyRef.Number != 0 {
 			t.Error("Empty IssueRef not handled correctly")
 		}
-		
+
 		t.Log("✅ Validation error scenarios covered")
 	})
 
@@ -132,7 +132,7 @@ func TestIntegrationWorkflow(t *testing.T) {
 	t.Run("SuccessReportingStructure", func(t *testing.T) {
 		// Test relationship type handling
 		relationshipTypes := []string{"blocked-by", "blocks"}
-		
+
 		for _, relType := range relationshipTypes {
 			if relType != "blocked-by" && relType != "blocks" {
 				t.Errorf("Invalid relationship type: %s", relType)
@@ -148,7 +148,7 @@ func TestIntegrationWorkflow(t *testing.T) {
 		if symbolMap["blocked-by"] != "←" || symbolMap["blocks"] != "→" {
 			t.Error("Relationship symbol mapping incorrect")
 		}
-		
+
 		t.Log("✅ Success reporting structure works correctly")
 	})
 
@@ -163,16 +163,16 @@ func TestAPIIntegrationPoints(t *testing.T) {
 	t.Run("EndpointConstruction", func(t *testing.T) {
 		source := CreateIssueRef("testowner", "testrepo", 123)
 		relationshipID := "target/repo#456"
-		
+
 		expectedEndpoint := "repos/testowner/testrepo/issues/123/dependencies/target/repo#456"
-		actualEndpoint := "repos/" + source.Owner + "/" + source.Repo + "/issues/" + 
+		actualEndpoint := "repos/" + source.Owner + "/" + source.Repo + "/issues/" +
 			string(rune(source.Number)) + "/dependencies/" + relationshipID
-		
+
 		// Note: This is a simplified test - actual implementation uses fmt.Sprintf
 		if len(expectedEndpoint) == 0 || len(actualEndpoint) == 0 {
 			t.Error("Endpoint construction components not available")
 		}
-		
+
 		t.Log("✅ API endpoint construction components available")
 	})
 
@@ -180,12 +180,12 @@ func TestAPIIntegrationPoints(t *testing.T) {
 	t.Run("RetryLogicStructure", func(t *testing.T) {
 		maxRetries := 3
 		baseDelay := 1 // seconds (simplified for test)
-		
+
 		// Test retry parameters
 		if maxRetries != 3 {
 			t.Error("Max retries not configured correctly")
 		}
-		
+
 		if baseDelay != 1 {
 			t.Error("Base delay not configured correctly")
 		}
@@ -197,7 +197,7 @@ func TestAPIIntegrationPoints(t *testing.T) {
 				t.Errorf("Exponential backoff calculation incorrect for attempt %d", attempt)
 			}
 		}
-		
+
 		t.Log("✅ Retry logic structure works correctly")
 	})
 
@@ -217,10 +217,10 @@ func TestAPIIntegrationPoints(t *testing.T) {
 				t.Error("Authentication error not mapped correctly")
 			}
 			if statusCode == 403 && expectedType != ErrorTypePermission {
-				t.Error("Permission error not mapped correctly") 
+				t.Error("Permission error not mapped correctly")
 			}
 		}
-		
+
 		t.Log("✅ Error categorization works correctly")
 	})
 
@@ -240,7 +240,7 @@ func TestAPIIntegrationPoints(t *testing.T) {
 		if sameRepo {
 			t.Error("Same repository incorrectly detected as cross-repo")
 		}
-		
+
 		t.Log("✅ Cross-repository support works correctly")
 	})
 
@@ -286,7 +286,7 @@ func TestEdgeCaseHandling(t *testing.T) {
 				t.Errorf("Invalid type %s incorrectly marked as valid", invalidType)
 			}
 		}
-		
+
 		t.Log("✅ Invalid relationship type detection works correctly")
 	})
 
@@ -303,11 +303,11 @@ func TestEdgeCaseHandling(t *testing.T) {
 		if negativeRef.Number >= 0 {
 			t.Error("Negative issue number not detected")
 		}
-		
+
 		t.Log("✅ Malformed issue reference detection works correctly")
 	})
 
-	// Test 4: Repository Name Edge Cases  
+	// Test 4: Repository Name Edge Cases
 	t.Run("RepositoryNameEdgeCases", func(t *testing.T) {
 		// Test repository name parsing
 		testCases := []struct {
@@ -327,7 +327,7 @@ func TestEdgeCaseHandling(t *testing.T) {
 				}
 			}
 		}
-		
+
 		t.Log("✅ Repository name edge cases handled correctly")
 	})
 

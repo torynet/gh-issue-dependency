@@ -100,7 +100,7 @@ func createEmptyDependencyData() *DependencyData {
 // Test DefaultOutputOptions
 func TestDefaultOutputOptions(t *testing.T) {
 	options := DefaultOutputOptions()
-	
+
 	assert.Equal(t, FormatAuto, options.Format)
 	assert.Empty(t, options.JSONFields)
 	assert.False(t, options.Detailed)
@@ -117,7 +117,7 @@ func TestNewOutputFormatter(t *testing.T) {
 		assert.NotNil(t, formatter.options)
 		assert.Equal(t, FormatAuto, formatter.options.Format)
 	})
-	
+
 	t.Run("with custom options", func(t *testing.T) {
 		options := &OutputOptions{
 			Format:     FormatJSON,
@@ -191,13 +191,13 @@ func TestFormatTTYOutput(t *testing.T) {
 				Writer:   &buffer,
 				Detailed: tt.detailed,
 			}
-			
+
 			formatter := NewOutputFormatter(options)
 			err := formatter.FormatOutput(tt.data)
-			
+
 			assert.NoError(t, err)
 			output := buffer.String()
-			
+
 			for _, expected := range tt.contains {
 				assert.Contains(t, output, expected, "Output should contain: %s", expected)
 			}
@@ -208,10 +208,10 @@ func TestFormatTTYOutput(t *testing.T) {
 // Test Plain Output Formatting
 func TestFormatPlainOutput(t *testing.T) {
 	tests := []struct {
-		name     string
-		data     *DependencyData
-		detailed bool
-		contains []string
+		name        string
+		data        *DependencyData
+		detailed    bool
+		contains    []string
 		notContains []string
 	}{
 		{
@@ -269,13 +269,13 @@ func TestFormatPlainOutput(t *testing.T) {
 				Writer:   &buffer,
 				Detailed: tt.detailed,
 			}
-			
+
 			formatter := NewOutputFormatter(options)
 			err := formatter.FormatOutput(tt.data)
-			
+
 			assert.NoError(t, err)
 			output := buffer.String()
-			
+
 			for _, expected := range tt.contains {
 				assert.Contains(t, output, expected, "Output should contain: %s", expected)
 			}
@@ -304,19 +304,19 @@ func TestFormatJSONOutput(t *testing.T) {
 				assert.Contains(t, output, "blocked_by")
 				assert.Contains(t, output, "blocks")
 				assert.Contains(t, output, "summary")
-				
+
 				sourceIssue := output["source_issue"].(map[string]interface{})
 				assert.Equal(t, float64(123), sourceIssue["number"])
 				assert.Equal(t, "Main Feature Implementation", sourceIssue["title"])
 				assert.Equal(t, "open", sourceIssue["state"])
 				assert.Equal(t, "testowner/testrepo", sourceIssue["repository"])
-				
+
 				blockedBy := output["blocked_by"].([]interface{})
 				assert.Len(t, blockedBy, 2)
-				
+
 				blocks := output["blocks"].([]interface{})
 				assert.Len(t, blocks, 1)
-				
+
 				summary := output["summary"].(map[string]interface{})
 				assert.Equal(t, float64(3), summary["total_count"])
 				assert.Equal(t, float64(2), summary["blocked_by_count"])
@@ -332,7 +332,7 @@ func TestFormatJSONOutput(t *testing.T) {
 				assert.Contains(t, sourceIssue, "assignees")
 				assert.Contains(t, sourceIssue, "labels")
 				assert.Contains(t, sourceIssue, "html_url")
-				
+
 				assignees := sourceIssue["assignees"].([]interface{})
 				assert.Len(t, assignees, 1)
 				assignee := assignees[0].(map[string]interface{})
@@ -361,12 +361,12 @@ func TestFormatJSONOutput(t *testing.T) {
 					blockedBySlice := blockedBy.([]interface{})
 					assert.Len(t, blockedBySlice, 0)
 				}
-				
+
 				if blocks, exists := output["blocks"]; exists && blocks != nil {
 					blocksSlice := blocks.([]interface{})
 					assert.Len(t, blocksSlice, 0)
 				}
-				
+
 				summary := output["summary"].(map[string]interface{})
 				assert.Equal(t, float64(0), summary["total_count"])
 			},
@@ -382,16 +382,16 @@ func TestFormatJSONOutput(t *testing.T) {
 				Detailed:   tt.detailed,
 				JSONFields: tt.jsonFields,
 			}
-			
+
 			formatter := NewOutputFormatter(options)
 			err := formatter.FormatOutput(tt.data)
-			
+
 			assert.NoError(t, err)
-			
+
 			var output map[string]interface{}
 			err = json.Unmarshal(buffer.Bytes(), &output)
 			require.NoError(t, err, "JSON output should be valid")
-			
+
 			tt.validate(t, output)
 		})
 	}
@@ -411,13 +411,13 @@ func TestFormatCSVOutput(t *testing.T) {
 			detailed: false,
 			validate: func(t *testing.T, lines []string) {
 				assert.Len(t, lines, 5) // header + source + 2 blocked_by + 1 blocks + empty line
-				
+
 				// Header
 				assert.Equal(t, "type,repository,number,title,state", lines[0])
-				
+
 				// Source issue
 				assert.Contains(t, lines[1], "source,testowner/testrepo,123,Main Feature Implementation,open")
-				
+
 				// Dependencies
 				assert.Contains(t, lines[2], "blocked_by,testowner/testrepo,45,Setup Database Schema,open")
 				assert.Contains(t, lines[3], "blocked_by,testowner/testrepo,67,API Endpoint Creation,closed")
@@ -431,7 +431,7 @@ func TestFormatCSVOutput(t *testing.T) {
 			validate: func(t *testing.T, lines []string) {
 				// Header should include additional fields
 				assert.Equal(t, "type,repository,number,title,state,assignees,labels,html_url", lines[0])
-				
+
 				// Check assignees and labels are included
 				assert.Contains(t, lines[1], "@alice")
 				assert.Contains(t, lines[2], "@bob")
@@ -440,7 +440,7 @@ func TestFormatCSVOutput(t *testing.T) {
 			},
 		},
 		{
-			name:     "CSV with special characters",
+			name: "CSV with special characters",
 			data: &DependencyData{
 				SourceIssue: Issue{
 					Number:     1,
@@ -469,12 +469,12 @@ func TestFormatCSVOutput(t *testing.T) {
 				Writer:   &buffer,
 				Detailed: tt.detailed,
 			}
-			
+
 			formatter := NewOutputFormatter(options)
 			err := formatter.FormatOutput(tt.data)
-			
+
 			assert.NoError(t, err)
-			
+
 			lines := strings.Split(strings.TrimSpace(buffer.String()), "\n")
 			tt.validate(t, lines)
 		})
@@ -522,10 +522,10 @@ func TestDetermineFormat(t *testing.T) {
 				Format: tt.format,
 				Writer: &buffer,
 			}
-			
+
 			formatter := NewOutputFormatter(options)
 			actualFormat := formatter.determineFormat()
-			
+
 			assert.Equal(t, tt.expectedFormat, actualFormat)
 		})
 	}
@@ -534,12 +534,12 @@ func TestDetermineFormat(t *testing.T) {
 // Test Empty State Messages
 func TestGetEmptyStateMessage(t *testing.T) {
 	tests := []struct {
-		name        string
-		stateFilter string
-		data        *DependencyData
+		name         string
+		stateFilter  string
+		data         *DependencyData
 		originalData *DependencyData
-		expectMain  string
-		expectTip   string
+		expectMain   string
+		expectTip    string
 	}{
 		{
 			name:        "all state - no dependencies",
@@ -581,10 +581,10 @@ func TestGetEmptyStateMessage(t *testing.T) {
 				StateFilter:  tt.stateFilter,
 				OriginalData: tt.originalData,
 			}
-			
+
 			formatter := NewOutputFormatter(options)
 			mainMsg, tipMsg := formatter.getEmptyStateMessage(tt.data)
-			
+
 			assert.Contains(t, mainMsg, tt.expectMain)
 			assert.Contains(t, tipMsg, tt.expectTip)
 		})
@@ -604,13 +604,13 @@ func TestHelperFunctions(t *testing.T) {
 			{"with\nnewline", "\"with\nnewline\""},
 			{"with,comma\"and quote", "\"with,comma\"\"and quote\""},
 		}
-		
+
 		for _, tt := range tests {
 			result := escapeCSV(tt.input)
 			assert.Equal(t, tt.expected, result, "escapeCSV(%q)", tt.input)
 		}
 	})
-	
+
 	t.Run("formatAssigneesForCSV", func(t *testing.T) {
 		users := []User{
 			{Login: "alice"},
@@ -618,11 +618,11 @@ func TestHelperFunctions(t *testing.T) {
 		}
 		result := formatAssigneesForCSV(users)
 		assert.Equal(t, "@alice; @bob", result)
-		
+
 		empty := formatAssigneesForCSV([]User{})
 		assert.Equal(t, "", empty)
 	})
-	
+
 	t.Run("formatLabelsForCSV", func(t *testing.T) {
 		labels := []Label{
 			{Name: "bug"},
@@ -630,7 +630,7 @@ func TestHelperFunctions(t *testing.T) {
 		}
 		result := formatLabelsForCSV(labels)
 		assert.Equal(t, "bug; urgent", result)
-		
+
 		empty := formatLabelsForCSV([]Label{})
 		assert.Equal(t, "", empty)
 	})
@@ -639,7 +639,7 @@ func TestHelperFunctions(t *testing.T) {
 // Benchmark tests for performance validation
 func BenchmarkFormatTTYOutput(b *testing.B) {
 	data := createTestDependencyData()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var buffer bytes.Buffer
@@ -647,7 +647,7 @@ func BenchmarkFormatTTYOutput(b *testing.B) {
 			Format: FormatTTY,
 			Writer: &buffer,
 		}
-		
+
 		formatter := NewOutputFormatter(options)
 		_ = formatter.FormatOutput(data)
 	}
@@ -655,7 +655,7 @@ func BenchmarkFormatTTYOutput(b *testing.B) {
 
 func BenchmarkFormatJSONOutput(b *testing.B) {
 	data := createTestDependencyData()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var buffer bytes.Buffer
@@ -663,7 +663,7 @@ func BenchmarkFormatJSONOutput(b *testing.B) {
 			Format: FormatJSON,
 			Writer: &buffer,
 		}
-		
+
 		formatter := NewOutputFormatter(options)
 		_ = formatter.FormatOutput(data)
 	}
@@ -671,7 +671,7 @@ func BenchmarkFormatJSONOutput(b *testing.B) {
 
 func BenchmarkFormatCSVOutput(b *testing.B) {
 	data := createTestDependencyData()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var buffer bytes.Buffer
@@ -679,7 +679,7 @@ func BenchmarkFormatCSVOutput(b *testing.B) {
 			Format: FormatCSV,
 			Writer: &buffer,
 		}
-		
+
 		formatter := NewOutputFormatter(options)
 		_ = formatter.FormatOutput(data)
 	}
@@ -697,7 +697,7 @@ func TestLargeDatasetOutput(t *testing.T) {
 		},
 		FetchedAt: time.Now(),
 	}
-	
+
 	// Add many dependencies
 	for i := 1; i <= 100; i++ {
 		dep := DependencyRelation{
@@ -713,37 +713,37 @@ func TestLargeDatasetOutput(t *testing.T) {
 		data.BlockedBy = append(data.BlockedBy, dep)
 	}
 	data.TotalCount = len(data.BlockedBy)
-	
+
 	t.Run("large dataset TTY output", func(t *testing.T) {
 		var buffer bytes.Buffer
 		options := &OutputOptions{
 			Format: FormatTTY,
 			Writer: &buffer,
 		}
-		
+
 		formatter := NewOutputFormatter(options)
 		err := formatter.FormatOutput(data)
-		
+
 		assert.NoError(t, err)
 		assert.Contains(t, buffer.String(), "BLOCKED BY (100 issues)")
 	})
-	
+
 	t.Run("large dataset JSON output", func(t *testing.T) {
 		var buffer bytes.Buffer
 		options := &OutputOptions{
 			Format: FormatJSON,
 			Writer: &buffer,
 		}
-		
+
 		formatter := NewOutputFormatter(options)
 		err := formatter.FormatOutput(data)
-		
+
 		assert.NoError(t, err)
-		
+
 		var output map[string]interface{}
 		err = json.Unmarshal(buffer.Bytes(), &output)
 		require.NoError(t, err)
-		
+
 		blockedBy := output["blocked_by"].([]interface{})
 		assert.Len(t, blockedBy, 100)
 	})

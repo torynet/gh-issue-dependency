@@ -104,7 +104,7 @@ FLAGS
 				WithSuggestion("Use --blocks to remove issues that this one blocks").
 				WithSuggestion("Use --all to remove all dependency relationships")
 		}
-		
+
 		if flagCount > 1 {
 			return pkg.NewAppError(
 				pkg.ErrorTypeValidation,
@@ -182,7 +182,7 @@ var (
 	// removeBlockedBy contains a comma-separated list of issue references to remove
 	// from blocking the target issue. This will remove the "blocked by" relationship.
 	removeBlockedBy string
-	
+
 	// removeBlocks contains a comma-separated list of issue references to remove
 	// from being blocked by the target issue. This will remove the "blocks" relationship.
 	removeBlocks string

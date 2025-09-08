@@ -161,22 +161,22 @@ func TestFormatUserError(t *testing.T) {
 		WithSuggestion("Try this")
 
 	formatted := FormatUserError(err)
-	
+
 	// Should contain the main message
 	if !contains(formatted, "Test error") {
 		t.Error("Formatted error should contain main message")
 	}
-	
+
 	// Should contain context
 	if !contains(formatted, "field: value") {
 		t.Error("Formatted error should contain context")
 	}
-	
+
 	// Should contain suggestions
 	if !contains(formatted, "Try this") {
 		t.Error("Formatted error should contain suggestions")
 	}
-	
+
 	// Test with basic error
 	basicErr := errors.New("basic")
 	basicFormatted := FormatUserError(basicErr)
@@ -186,9 +186,9 @@ func TestFormatUserError(t *testing.T) {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) && 
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		stringContains(s, substr))))
+	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			stringContains(s, substr))))
 }
 
 func stringContains(s, substr string) bool {

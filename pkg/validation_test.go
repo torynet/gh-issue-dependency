@@ -9,7 +9,7 @@ import (
 func TestValidationIntegration(t *testing.T) {
 	// This test demonstrates the validation integration without making actual API calls
 	// In a real scenario, these would be integration tests with mock GitHub API responses
-	
+
 	t.Run("ParseIssueRefWithRepo", func(t *testing.T) {
 		tests := []struct {
 			name         string
@@ -53,11 +53,11 @@ func TestValidationIntegration(t *testing.T) {
 				expectError:  true,
 			},
 		}
-		
+
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				result, err := ParseIssueRefWithRepo(tt.issueRef, tt.defaultOwner, tt.defaultRepo)
-				
+
 				if tt.expectError {
 					if err == nil {
 						t.Errorf("Expected error but got none")
@@ -73,7 +73,7 @@ func TestValidationIntegration(t *testing.T) {
 			})
 		}
 	})
-	
+
 	t.Run("CreateIssueRef", func(t *testing.T) {
 		ref := CreateIssueRef("owner", "repo", 123)
 		expected := IssueRef{
@@ -82,12 +82,12 @@ func TestValidationIntegration(t *testing.T) {
 			Number:   123,
 			FullName: "owner/repo",
 		}
-		
+
 		if ref != expected {
 			t.Errorf("Expected %v, got %v", expected, ref)
 		}
 	})
-	
+
 	t.Run("IssueRef.String", func(t *testing.T) {
 		tests := []struct {
 			name     string
@@ -114,7 +114,7 @@ func TestValidationIntegration(t *testing.T) {
 				expected: "owner/repo#123",
 			},
 		}
-		
+
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				result := tt.ref.String()
@@ -127,11 +127,11 @@ func TestValidationIntegration(t *testing.T) {
 }
 
 // TestValidationErrorScenarios demonstrates error handling for various scenarios
-func TestValidationErrorScenarios(t *testing.T) {
+func TestBasicValidationErrorScenarios(t *testing.T) {
 	t.Run("Input validation errors", func(t *testing.T) {
 		// Test cases would validate different error conditions
 		// This demonstrates the expected error patterns without actual API calls
-		
+
 		scenarios := []struct {
 			name        string
 			description string
@@ -153,7 +153,7 @@ func TestValidationErrorScenarios(t *testing.T) {
 				errorType:   ErrorTypeValidation,
 			},
 		}
-		
+
 		for _, scenario := range scenarios {
 			t.Run(scenario.name, func(t *testing.T) {
 				// These tests would validate the error handling without making API calls
@@ -165,50 +165,50 @@ func TestValidationErrorScenarios(t *testing.T) {
 }
 
 // Example usage patterns for integration with cmd/remove.go
-func ExampleRemovalValidator_ValidateRemoval() {
+func ExampleBasicRemovalValidator_ValidateRemoval() {
 	// This example shows how to use the validator in the remove command
-	
+
 	// 1. Create validator
 	validator, err := NewRemovalValidator()
 	if err != nil {
 		fmt.Printf("Failed to create validator: %v\n", err)
 		return
 	}
-	
+
 	// 2. Parse issue references
 	source := CreateIssueRef("owner", "repo", 123)
 	target := CreateIssueRef("owner", "repo", 456)
-	
+
 	// 3. Validate removal
 	err = validator.ValidateRemoval(source, target, "blocked-by")
 	if err != nil {
 		fmt.Printf("Validation failed: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("Validation successful - ready to remove relationship")
 }
 
 // Example batch validation
-func ExampleRemovalValidator_ValidateBatchRemoval() {
+func ExampleBasicRemovalValidator_ValidateBatchRemoval() {
 	validator, err := NewRemovalValidator()
 	if err != nil {
 		fmt.Printf("Failed to create validator: %v\n", err)
 		return
 	}
-	
+
 	source := CreateIssueRef("owner", "repo", 123)
 	targets := []IssueRef{
 		CreateIssueRef("owner", "repo", 456),
 		CreateIssueRef("owner", "repo", 789),
 		CreateIssueRef("other", "repo", 101),
 	}
-	
+
 	err = validator.ValidateBatchRemoval(source, targets, "blocks")
 	if err != nil {
 		fmt.Printf("Batch validation failed: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("Batch validation successful")
 }

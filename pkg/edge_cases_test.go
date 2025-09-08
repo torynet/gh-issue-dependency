@@ -61,12 +61,12 @@ func TestErrorHandlingEdgeCases(t *testing.T) {
 		for _, tc := range edgeCases {
 			t.Run(tc.name, func(t *testing.T) {
 				owner, repo, err := ParseRepoFlag(tc.input)
-				
+
 				if tc.expectError {
 					assert.Error(t, err, "Expected error for input: %s", tc.input)
 					assert.Empty(t, owner, "Owner should be empty on error")
 					assert.Empty(t, repo, "Repo should be empty on error")
-					
+
 					if tc.errorType != "" {
 						// In a real implementation, we'd check error types
 						assert.Contains(t, err.Error(), strings.ToLower(tc.input),
@@ -127,7 +127,7 @@ func TestErrorHandlingEdgeCases(t *testing.T) {
 		for _, tc := range edgeCases {
 			t.Run(tc.name, func(t *testing.T) {
 				owner, repo, issueNum, err := ParseIssueURL(tc.input)
-				
+
 				if tc.expectError {
 					assert.Error(t, err, "Expected error for URL: %s", tc.input)
 				} else {
@@ -162,13 +162,13 @@ func TestDataStructureEdgeCases(t *testing.T) {
 
 	t.Run("Issue with empty fields", func(t *testing.T) {
 		issue := Issue{
-			Number:     0,              // Zero number
-			Title:      "",             // Empty title
-			State:      "",             // Empty state
-			Assignees:  []User{},       // Empty slice
-			Labels:     []Label{},      // Empty slice
-			HTMLURL:    "",             // Empty URL
-			Repository: "",             // Empty repository
+			Number:     0,         // Zero number
+			Title:      "",        // Empty title
+			State:      "",        // Empty state
+			Assignees:  []User{},  // Empty slice
+			Labels:     []Label{}, // Empty slice
+			HTMLURL:    "",        // Empty URL
+			Repository: "",        // Empty repository
 		}
 
 		// Should not panic with empty fields
@@ -321,7 +321,7 @@ func TestOutputFormattingEdgeCases(t *testing.T) {
 		// Should handle nil writer gracefully (DefaultOutputOptions sets os.Stdout)
 		formatter := NewOutputFormatter(options)
 		assert.NotNil(t, formatter, "Should create formatter even with nil options")
-		
+
 		// Use the test data to avoid unused variable error
 		assert.Equal(t, 123, testData.SourceIssue.Number)
 	})
@@ -365,7 +365,7 @@ func TestCachingEdgeCases(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				key := getCacheKey(tc.owner, tc.repo, tc.number)
 				assert.Equal(t, 32, len(key), "Cache key should always be 32 chars (MD5 hash)")
-				
+
 				// Ensure uniqueness
 				assert.False(t, keys[key], "Cache keys should be unique")
 				keys[key] = true
@@ -378,8 +378,8 @@ func TestRepositoryContextEdgeCases(t *testing.T) {
 	t.Run("ResolveRepository with conflicting inputs", func(t *testing.T) {
 		// Test priority: repoFlag > issueURL > current repo
 		owner, repo, err := ResolveRepository(
-			"priority/repo",                                         // High priority
-			"https://github.com/from-url/repo/issues/123",          // Lower priority
+			"priority/repo", // High priority
+			"https://github.com/from-url/repo/issues/123", // Lower priority
 		)
 
 		// Should prioritize repo flag over URL
@@ -397,16 +397,16 @@ func TestRepositoryContextEdgeCases(t *testing.T) {
 	t.Run("ValidateRepoAccess with invalid repo", func(t *testing.T) {
 		// Test with obviously invalid repository
 		err := ValidateRepoAccess("definitely-does-not-exist", "invalid-repo-name-12345")
-		
+
 		// Should return appropriate error
 		assert.Error(t, err, "Should error for non-existent repository")
-		
+
 		// Error should indicate the problem
 		errorMsg := strings.ToLower(err.Error())
 		assert.True(t,
 			strings.Contains(errorMsg, "not found") ||
-			strings.Contains(errorMsg, "not available") ||
-			strings.Contains(errorMsg, "authentication"),
+				strings.Contains(errorMsg, "not available") ||
+				strings.Contains(errorMsg, "authentication"),
 			"Error should indicate repository access issue: %v", err)
 	})
 }
@@ -422,14 +422,14 @@ func TestAPIIntegrationEdgeCases(t *testing.T) {
 		// Should handle timeout gracefully
 		_, err := FetchIssueDependencies(shortCtx, "owner", "repo", 123)
 		assert.Error(t, err, "Should error with short timeout")
-		
+
 		// Error might be timeout or authentication - both are acceptable
 		errorMsg := strings.ToLower(err.Error())
 		assert.True(t,
 			strings.Contains(errorMsg, "timeout") ||
-			strings.Contains(errorMsg, "context") ||
-			strings.Contains(errorMsg, "authentication") ||
-			strings.Contains(errorMsg, "not available"),
+				strings.Contains(errorMsg, "context") ||
+				strings.Contains(errorMsg, "authentication") ||
+				strings.Contains(errorMsg, "not available"),
 			"Should indicate timeout or auth issue: %v", err)
 	})
 
@@ -438,8 +438,8 @@ func TestAPIIntegrationEdgeCases(t *testing.T) {
 			"https://github.com/",
 			"https://github.com/owner",
 			"https://github.com/owner/",
-			"github.com/owner/repo/issues/123", // Missing protocol
-			"https://github.com/owner/repo/issues/", // Missing issue number
+			"github.com/owner/repo/issues/123",         // Missing protocol
+			"https://github.com/owner/repo/issues/",    // Missing issue number
 			"https://github.com/owner/repo/issues/abc", // Non-numeric issue
 		}
 
@@ -511,7 +511,7 @@ func TestMemoryAndPerformanceEdgeCases(t *testing.T) {
 	t.Run("deeply nested repository paths", func(t *testing.T) {
 		// Test with repositories that have deep organization structures
 		deepRepo := strings.Repeat("organization/", 10) + "deeply/nested/repo/structure"
-		
+
 		data := &DependencyData{
 			SourceIssue: Issue{
 				Number:     123,
@@ -543,14 +543,14 @@ func TestConcurrencyEdgeCases(t *testing.T) {
 	t.Run("concurrent cache access", func(t *testing.T) {
 		// Test that cache operations are safe for concurrent access
 		// Note: Current implementation may not be fully concurrent-safe
-		
+
 		const numGoroutines = 10
 		done := make(chan bool, numGoroutines)
 
 		for i := 0; i < numGoroutines; i++ {
 			go func(id int) {
 				defer func() { done <- true }()
-				
+
 				// Generate different cache keys
 				key := getCacheKey("owner", "repo", id)
 				assert.Equal(t, 32, len(key), "Cache key should be valid length")
@@ -582,7 +582,7 @@ func TestConcurrencyEdgeCases(t *testing.T) {
 		for i := 0; i < numGoroutines; i++ {
 			go func(id int) {
 				defer func() { done <- true }()
-				
+
 				var buffer bytes.Buffer
 				options := &OutputOptions{
 					Format: FormatJSON,

@@ -60,7 +60,7 @@ func createBenchmarkData(dependencyCount int) *DependencyData {
 			Number:     1000,
 			Title:      "Performance Test Issue with a reasonably long title that represents real-world usage",
 			State:      "open",
-			Repository: "performance/test-repo",
+			Repository: RepositoryInfo{FullName: "performance/test-repo"},
 			HTMLURL:    "https://github.com/performance/test-repo/issues/1000",
 			Assignees: []User{
 				{Login: "performance-tester", HTMLURL: "https://github.com/performance-tester"},

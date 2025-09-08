@@ -17,11 +17,11 @@ import (
 type OutputFormat int
 
 const (
-	FormatAuto OutputFormat = iota // Auto-detect based on TTY
-	FormatTTY                      // Rich TTY output with colors and emojis
-	FormatPlain                    // Plain text output
-	FormatJSON                     // JSON output
-	FormatCSV                      // CSV output
+	FormatAuto  OutputFormat = iota // Auto-detect based on TTY
+	FormatTTY                       // Rich TTY output with colors and emojis
+	FormatPlain                     // Plain text output
+	FormatJSON                      // JSON output
+	FormatCSV                       // CSV output
 )
 
 // OutputOptions contains configuration for output formatting
@@ -30,7 +30,7 @@ type OutputOptions struct {
 	JSONFields   []string // Specific fields to include in JSON output
 	Detailed     bool     // Include detailed information
 	Writer       io.Writer
-	StateFilter  string   // Applied state filter for context-aware messaging
+	StateFilter  string          // Applied state filter for context-aware messaging
 	OriginalData *DependencyData // Original data before filtering for comparison
 }
 
@@ -134,7 +134,7 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 		for _, dep := range data.BlockedBy {
 			emoji := f.getStateEmoji(dep.Issue.State)
 			stateColor := f.getStateColor(dep.Issue.State)
-			
+
 			fmt.Fprintf(f.options.Writer, "%s #%-6d %s %s[%s]%s",
 				emoji, dep.Issue.Number, dep.Issue.Title,
 				stateColor(""), dep.Issue.State, termenv.CSI+termenv.ResetSeq)
@@ -176,7 +176,7 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 		for _, dep := range data.Blocking {
 			emoji := f.getStateEmoji(dep.Issue.State)
 			stateColor := f.getStateColor(dep.Issue.State)
-			
+
 			fmt.Fprintf(f.options.Writer, "%s #%-6d %s %s[%s]%s",
 				emoji, dep.Issue.Number, dep.Issue.Title,
 				stateColor(""), dep.Issue.State, termenv.CSI+termenv.ResetSeq)
@@ -610,11 +610,11 @@ func (f *OutputFormatter) addFilterContext(data *DependencyData) {
 // getEmptyStateMessage returns context-aware empty state message
 func (f *OutputFormatter) getEmptyStateMessage(data *DependencyData) (string, string) {
 	var mainMsg, tipMsg string
-	
+
 	// Check if we have original data to compare against
-	hasOriginalData := f.options.OriginalData != nil && 
+	hasOriginalData := f.options.OriginalData != nil &&
 		(f.options.OriginalData.TotalCount > data.TotalCount)
-	
+
 	switch f.options.StateFilter {
 	case "open":
 		if hasOriginalData {
@@ -629,7 +629,7 @@ func (f *OutputFormatter) getEmptyStateMessage(data *DependencyData) (string, st
 			mainMsg = fmt.Sprintf("No open dependencies found for issue #%d.", data.SourceIssue.Number)
 			tipMsg = "Use --state all to see closed dependencies, or --state closed for closed only."
 		}
-		
+
 	case "closed":
 		if hasOriginalData {
 			openCount := f.options.OriginalData.TotalCount - data.TotalCount
@@ -643,7 +643,7 @@ func (f *OutputFormatter) getEmptyStateMessage(data *DependencyData) (string, st
 			mainMsg = fmt.Sprintf("No closed dependencies found for issue #%d.", data.SourceIssue.Number)
 			tipMsg = "Use --state all to see open dependencies, or --state open for open only."
 		}
-		
+
 	default: // "all"
 		mainMsg = fmt.Sprintf("No dependencies found for issue #%d.", data.SourceIssue.Number)
 		tipMsg = "Use 'gh issue-dependency add' to create dependency relationships."
@@ -651,7 +651,6 @@ func (f *OutputFormatter) getEmptyStateMessage(data *DependencyData) (string, st
 			tipMsg += "\nNote: Some dependencies may exist in repositories you don't have access to."
 		}
 	}
-	
+
 	return mainMsg, tipMsg
 }
-

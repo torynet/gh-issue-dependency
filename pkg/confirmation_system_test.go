@@ -25,7 +25,7 @@ func (m *MockStdinReader) Read(p []byte) (n int, err error) {
 	if m.pos >= len(m.input) {
 		return 0, io.EOF
 	}
-	
+
 	n = copy(p, m.input[m.pos:])
 	m.pos += n
 	return n, nil
@@ -51,13 +51,13 @@ func (m *MockOutputWriter) Reset() {
 // TestDryRunMode tests the dry run functionality with comprehensive scenarios
 func TestDryRunMode(t *testing.T) {
 	tests := []struct {
-		name               string
-		source             IssueRef
-		targets            []IssueRef
-		relType            string
-		expectedOutput     []string
-		shouldShowPreview  bool
-		shouldMakeChanges  bool
+		name              string
+		source            IssueRef
+		targets           []IssueRef
+		relType           string
+		expectedOutput    []string
+		shouldShowPreview bool
+		shouldMakeChanges bool
 	}{
 		{
 			name:    "single dependency dry run - blocked-by",
@@ -145,40 +145,40 @@ func TestDryRunMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock output writer
-			mockWriter := &MockOutputWriter{}
-			
+			_ = &MockOutputWriter{}
+
 			// Simulate dry run execution
-			opts := RemoveOptions{DryRun: true, Force: false}
-			
-			t.Logf("Testing dry run: %s %s %d targets", 
+			_ = RemoveOptions{DryRun: true, Force: false}
+
+			t.Logf("Testing dry run: %s %s %d targets",
 				tt.source.String(), tt.relType, len(tt.targets))
-			
+
 			// Test dry run preview generation
 			output := generateDryRunPreview(tt.source, tt.targets, tt.relType)
-			
+
 			// Verify expected output elements are present
 			for _, expectedLine := range tt.expectedOutput {
 				assert.Contains(t, output, expectedLine,
 					"Dry run output should contain: %s", expectedLine)
 			}
-			
+
 			// Verify dry run characteristics
 			assert.True(t, tt.shouldShowPreview, "Dry run should show preview")
 			assert.False(t, tt.shouldMakeChanges, "Dry run should not make changes")
-			
+
 			// Verify relationship arrows are correct
 			if tt.relType == "blocked-by" {
 				assert.Contains(t, output, "←", "Blocked-by should use ← arrow")
 			} else if tt.relType == "blocks" {
 				assert.Contains(t, output, "→", "Blocks should use → arrow")
 			}
-			
+
 			// Verify all targets are shown
 			for _, target := range tt.targets {
 				assert.Contains(t, output, target.String(),
 					"Dry run should show target: %s", target.String())
 			}
-			
+
 			t.Logf("Dry run preview generated successfully")
 		})
 	}
@@ -187,7 +187,7 @@ func TestDryRunMode(t *testing.T) {
 // generateDryRunPreview simulates the dry run preview generation
 func generateDryRunPreview(source IssueRef, targets []IssueRef, relType string) string {
 	var output strings.Builder
-	
+
 	output.WriteString("Dry run: dependency removal preview\n")
 	output.WriteString("\n")
 	output.WriteString("Would remove:\n")
@@ -200,28 +200,28 @@ func generateDryRunPreview(source IssueRef, targets []IssueRef, relType string) 
 		case "blocks":
 			arrow = "→" // Source blocks target
 		}
-		
-		output.WriteString(fmt.Sprintf("  ❌ %s relationship: %s %s %s\n", 
+
+		output.WriteString(fmt.Sprintf("  ❌ %s relationship: %s %s %s\n",
 			relType, source.String(), arrow, target.String()))
 	}
 
 	output.WriteString("\n")
 	output.WriteString("No changes made. Use --force to skip confirmation or remove --dry-run to execute.\n")
-	
+
 	return output.String()
 }
 
 // TestConfirmationPrompts tests the confirmation system with various user responses
 func TestConfirmationPrompts(t *testing.T) {
 	tests := []struct {
-		name            string
-		source          IssueRef
-		targets         []IssueRef
-		relType         string
-		userInput       string
-		expectedPrompt  []string
-		expectedResult  bool
-		shouldProceed   bool
+		name           string
+		source         IssueRef
+		targets        []IssueRef
+		relType        string
+		userInput      string
+		expectedPrompt []string
+		expectedResult bool
+		shouldProceed  bool
 	}{
 		{
 			name:      "user confirms single dependency removal - 'y'",
@@ -323,8 +323,8 @@ func TestConfirmationPrompts(t *testing.T) {
 			shouldProceed:  false,
 		},
 		{
-			name:    "user confirms multiple dependency removal",
-			source:  CreateIssueRef("owner", "repo", 123),
+			name:   "user confirms multiple dependency removal",
+			source: CreateIssueRef("owner", "repo", 123),
 			targets: []IssueRef{
 				CreateIssueRef("owner", "repo", 456),
 				CreateIssueRef("other", "repo", 789),
@@ -345,8 +345,8 @@ func TestConfirmationPrompts(t *testing.T) {
 			shouldProceed:  true,
 		},
 		{
-			name:    "user cancels multiple dependency removal",
-			source:  CreateIssueRef("owner", "repo", 123),
+			name:   "user cancels multiple dependency removal",
+			source: CreateIssueRef("owner", "repo", 123),
 			targets: []IssueRef{
 				CreateIssueRef("owner", "repo", 456),
 				CreateIssueRef("other", "repo", 789),
@@ -382,26 +382,26 @@ func TestConfirmationPrompts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock input and output
-			mockInput := NewMockStdinReader(tt.userInput)
-			mockOutput := &MockOutputWriter{}
-			
+			_ = NewMockStdinReader(tt.userInput)
+			_ = &MockOutputWriter{}
+
 			t.Logf("Testing confirmation: %s %s %d targets, input: %q",
 				tt.source.String(), tt.relType, len(tt.targets), strings.TrimSpace(tt.userInput))
-			
+
 			// Generate confirmation prompt
 			prompt := generateConfirmationPrompt(tt.source, tt.targets, tt.relType)
-			
+
 			// Verify expected prompt elements are present
 			for _, expectedLine := range tt.expectedPrompt {
 				assert.Contains(t, prompt, expectedLine,
 					"Confirmation prompt should contain: %s", expectedLine)
 			}
-			
+
 			// Test user input processing
 			confirmed := processUserConfirmation(tt.userInput)
 			assert.Equal(t, tt.expectedResult, confirmed,
 				"User confirmation result should match expected")
-			
+
 			// Verify behavior based on confirmation
 			if tt.shouldProceed {
 				assert.True(t, confirmed, "Should proceed with removal")
@@ -417,15 +417,15 @@ func TestConfirmationPrompts(t *testing.T) {
 // generateConfirmationPrompt simulates the confirmation prompt generation
 func generateConfirmationPrompt(source IssueRef, targets []IssueRef, relType string) string {
 	var prompt strings.Builder
-	
+
 	if len(targets) == 1 {
 		prompt.WriteString("Remove dependency relationship?\n")
 	} else {
 		prompt.WriteString("Remove dependency relationship(s)?\n")
 	}
-	
+
 	prompt.WriteString(fmt.Sprintf("  Source: %s\n", source.String()))
-	
+
 	if len(targets) == 1 {
 		prompt.WriteString(fmt.Sprintf("  Target: %s\n", targets[0].String()))
 	} else {
@@ -434,25 +434,25 @@ func generateConfirmationPrompt(source IssueRef, targets []IssueRef, relType str
 			prompt.WriteString(fmt.Sprintf("    - %s\n", target.String()))
 		}
 	}
-	
+
 	prompt.WriteString(fmt.Sprintf("  Type: %s\n", relType))
 	prompt.WriteString("\n")
-	
+
 	if len(targets) == 1 {
 		prompt.WriteString(fmt.Sprintf("This will remove the \"%s\" relationship between these issues.\n", relType))
 	} else {
 		prompt.WriteString(fmt.Sprintf("This will remove %d \"%s\" relationships.\n", len(targets), relType))
 	}
-	
+
 	prompt.WriteString("Continue? (y/N): ")
-	
+
 	return prompt.String()
 }
 
 // processUserConfirmation simulates processing user input for confirmation
 func processUserConfirmation(input string) bool {
 	input = strings.ToLower(strings.TrimSpace(input))
-	
+
 	// Handle multiple inputs (for invalid input scenarios)
 	lines := strings.Split(input, "\n")
 	for _, line := range lines {
@@ -465,7 +465,7 @@ func processUserConfirmation(input string) bool {
 		}
 		// Invalid inputs are ignored, continue to next line
 	}
-	
+
 	// Default to false (cancel) if no valid input found
 	return false
 }
@@ -473,14 +473,14 @@ func processUserConfirmation(input string) bool {
 // TestForceMode tests the force flag functionality
 func TestForceMode(t *testing.T) {
 	tests := []struct {
-		name              string
-		source            IssueRef
-		targets           []IssueRef
-		relType           string
-		forceFlag         bool
-		shouldPrompt      bool
-		shouldProceed     bool
-		expectedBehavior  string
+		name             string
+		source           IssueRef
+		targets          []IssueRef
+		relType          string
+		forceFlag        bool
+		shouldPrompt     bool
+		shouldProceed    bool
+		expectedBehavior string
 	}{
 		{
 			name:             "force flag skips confirmation - single target",
@@ -493,8 +493,8 @@ func TestForceMode(t *testing.T) {
 			expectedBehavior: "skip confirmation and proceed directly",
 		},
 		{
-			name:    "force flag skips confirmation - multiple targets",
-			source:  CreateIssueRef("owner", "repo", 123),
+			name:   "force flag skips confirmation - multiple targets",
+			source: CreateIssueRef("owner", "repo", 123),
 			targets: []IssueRef{
 				CreateIssueRef("owner", "repo", 456),
 				CreateIssueRef("other", "repo", 789),
@@ -516,8 +516,8 @@ func TestForceMode(t *testing.T) {
 			expectedBehavior: "show confirmation prompt and wait for user input",
 		},
 		{
-			name:    "no force flag requires confirmation - multiple targets",
-			source:  CreateIssueRef("owner", "repo", 123),
+			name:   "no force flag requires confirmation - multiple targets",
+			source: CreateIssueRef("owner", "repo", 123),
 			targets: []IssueRef{
 				CreateIssueRef("owner", "repo", 456),
 				CreateIssueRef("other", "repo", 789),
@@ -536,10 +536,10 @@ func TestForceMode(t *testing.T) {
 				DryRun: false,
 				Force:  tt.forceFlag,
 			}
-			
+
 			t.Logf("Testing force mode: force=%v, %s %s %d targets",
 				tt.forceFlag, tt.source.String(), tt.relType, len(tt.targets))
-			
+
 			// Test force flag behavior
 			if tt.forceFlag {
 				assert.False(t, tt.shouldPrompt, "Force mode should skip confirmation prompt")
@@ -549,7 +549,7 @@ func TestForceMode(t *testing.T) {
 				assert.True(t, tt.shouldPrompt, "Non-force mode should show confirmation prompt")
 				t.Logf("Interactive mode: %s", tt.expectedBehavior)
 			}
-			
+
 			// Verify RemoveOptions configuration
 			assert.Equal(t, tt.forceFlag, opts.Force, "Force flag should match expected")
 			assert.False(t, opts.DryRun, "DryRun should be false for force tests")
@@ -560,13 +560,13 @@ func TestForceMode(t *testing.T) {
 // TestConfirmationAndDryRunInteraction tests interaction between confirmation and dry run modes
 func TestConfirmationAndDryRunInteraction(t *testing.T) {
 	scenarios := []struct {
-		name               string
-		dryRun             bool
-		force              bool
-		expectedBehavior   string
-		shouldShowPreview  bool
-		shouldPrompt       bool
-		shouldExecute      bool
+		name              string
+		dryRun            bool
+		force             bool
+		expectedBehavior  string
+		shouldShowPreview bool
+		shouldPrompt      bool
+		shouldExecute     bool
 	}{
 		{
 			name:              "dry run only",
@@ -612,31 +612,31 @@ func TestConfirmationAndDryRunInteraction(t *testing.T) {
 				DryRun: scenario.dryRun,
 				Force:  scenario.force,
 			}
-			
-			source := CreateIssueRef("owner", "repo", 123)
-			target := CreateIssueRef("owner", "repo", 456)
-			
+
+			_ = CreateIssueRef("owner", "repo", 123)
+			_ = CreateIssueRef("owner", "repo", 456)
+
 			t.Logf("Testing interaction: dryRun=%v, force=%v", scenario.dryRun, scenario.force)
 			t.Logf("Expected behavior: %s", scenario.expectedBehavior)
-			
+
 			// Test behavior based on flags
 			if scenario.dryRun {
 				assert.True(t, scenario.shouldShowPreview, "Dry run should show preview")
 				assert.False(t, scenario.shouldExecute, "Dry run should not execute")
 				t.Logf("Dry run mode: showing preview without execution")
 			}
-			
+
 			if scenario.force && !scenario.dryRun {
 				assert.False(t, scenario.shouldPrompt, "Force mode should skip prompt")
 				assert.True(t, scenario.shouldExecute, "Force mode should execute")
 				t.Logf("Force mode: executing without confirmation")
 			}
-			
+
 			if !scenario.dryRun && !scenario.force {
 				assert.True(t, scenario.shouldPrompt, "Interactive mode should prompt")
 				t.Logf("Interactive mode: showing confirmation prompt")
 			}
-			
+
 			// Verify flag configuration
 			assert.Equal(t, scenario.dryRun, opts.DryRun, "DryRun flag should match")
 			assert.Equal(t, scenario.force, opts.Force, "Force flag should match")
@@ -692,7 +692,7 @@ func TestConfirmationErrorHandling(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			t.Logf("Testing error scenario: %s", scenario.name)
 			t.Logf("Simulated error: %s", scenario.simulateError)
-			
+
 			// Verify error conditions
 			switch scenario.simulateError {
 			case "empty source":
@@ -707,7 +707,7 @@ func TestConfirmationErrorHandling(t *testing.T) {
 				// This would be tested with a mock that returns an error
 				t.Logf("Would simulate stdin read error")
 			}
-			
+
 			t.Logf("Expected error type: %s", scenario.expectedError)
 		})
 	}
@@ -716,11 +716,11 @@ func TestConfirmationErrorHandling(t *testing.T) {
 // TestConfirmationOutputFormatting tests the formatting of confirmation prompts
 func TestConfirmationOutputFormatting(t *testing.T) {
 	formattingTests := []struct {
-		name            string
-		source          IssueRef
-		targets         []IssueRef
-		relType         string
-		expectedFormat  []string
+		name           string
+		source         IssueRef
+		targets        []IssueRef
+		relType        string
+		expectedFormat []string
 	}{
 		{
 			name:    "simple same-repo formatting",
@@ -783,28 +783,28 @@ func TestConfirmationOutputFormatting(t *testing.T) {
 	for _, tt := range formattingTests {
 		t.Run(tt.name, func(t *testing.T) {
 			prompt := generateConfirmationPrompt(tt.source, tt.targets, tt.relType)
-			
+
 			t.Logf("Testing formatting for: %s", tt.name)
-			
+
 			// Verify all expected format elements are present
 			for _, expectedElement := range tt.expectedFormat {
 				assert.Contains(t, prompt, expectedElement,
 					"Confirmation prompt should contain: %s", expectedElement)
 			}
-			
+
 			// Verify proper issue reference formatting
 			assert.Contains(t, prompt, tt.source.String(),
 				"Prompt should contain formatted source issue")
-			
+
 			for _, target := range tt.targets {
 				assert.Contains(t, prompt, target.String(),
 					"Prompt should contain formatted target issue: %s", target.String())
 			}
-			
+
 			// Verify relationship type formatting
 			assert.Contains(t, prompt, fmt.Sprintf("Type: %s", tt.relType),
 				"Prompt should contain formatted relationship type")
-			
+
 			t.Logf("Formatting verified successfully")
 		})
 	}

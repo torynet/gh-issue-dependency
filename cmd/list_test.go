@@ -18,7 +18,7 @@ func createTestDependencyData() *pkg.DependencyData {
 			Number:     123,
 			Title:      "Main Feature Implementation",
 			State:      "open",
-			Repository: "testowner/testrepo",
+			Repository: pkg.RepositoryInfo{FullName: "testowner/testrepo"},
 			HTMLURL:    "https://github.com/testowner/testrepo/issues/123",
 			Assignees: []pkg.User{
 				{Login: "alice", HTMLURL: "https://github.com/alice"},
@@ -33,25 +33,25 @@ func createTestDependencyData() *pkg.DependencyData {
 					Number:     45,
 					Title:      "Setup Database Schema",
 					State:      "open",
-					Repository: "testowner/testrepo",
+					Repository: pkg.RepositoryInfo{FullName: "testowner/testrepo"},
 					HTMLURL:    "https://github.com/testowner/testrepo/issues/45",
 					Assignees: []pkg.User{
 						{Login: "bob", HTMLURL: "https://github.com/bob"},
 					},
 				},
 				Type:       "blocked_by",
-				Repository: "testowner/testrepo",
+				Repository: pkg.RepositoryInfo{FullName: "testowner/testrepo"},
 			},
 			{
 				Issue: pkg.Issue{
 					Number:     67,
 					Title:      "API Endpoint Creation",
 					State:      "closed",
-					Repository: "testowner/testrepo",
+					Repository: pkg.RepositoryInfo{FullName: "testowner/testrepo"},
 					HTMLURL:    "https://github.com/testowner/testrepo/issues/67",
 				},
 				Type:       "blocked_by",
-				Repository: "testowner/testrepo",
+				Repository: pkg.RepositoryInfo{FullName: "testowner/testrepo"},
 			},
 		},
 		Blocking: []pkg.DependencyRelation{
@@ -60,7 +60,7 @@ func createTestDependencyData() *pkg.DependencyData {
 					Number:     89,
 					Title:      "Frontend Integration",
 					State:      "open",
-					Repository: "testowner/frontend",
+					Repository: pkg.RepositoryInfo{FullName: "testowner/frontend"},
 					HTMLURL:    "https://github.com/testowner/frontend/issues/89",
 					Assignees: []pkg.User{
 						{Login: "charlie", HTMLURL: "https://github.com/charlie"},
@@ -72,7 +72,7 @@ func createTestDependencyData() *pkg.DependencyData {
 					},
 				},
 				Type:       "blocks",
-				Repository: "testowner/frontend",
+				Repository: pkg.RepositoryInfo{FullName: "testowner/frontend"},
 			},
 		},
 		FetchedAt:  time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
@@ -186,53 +186,53 @@ func TestApplySorting(t *testing.T) {
 	originalData := &pkg.DependencyData{
 		SourceIssue: pkg.Issue{Number: 100, Title: "Source", State: "open"},
 		BlockedBy: []pkg.DependencyRelation{
-			{Issue: pkg.Issue{Number: 3, Title: "Zebra Issue", State: "closed", Repository: "zebra/repo"}, Repository: "zebra/repo", Type: "blocked_by"},
-			{Issue: pkg.Issue{Number: 1, Title: "Alpha Issue", State: "open", Repository: "alpha/repo"}, Repository: "alpha/repo", Type: "blocked_by"},
-			{Issue: pkg.Issue{Number: 2, Title: "Beta Issue", State: "open", Repository: "beta/repo"}, Repository: "beta/repo", Type: "blocked_by"},
+			{Issue: pkg.Issue{Number: 3, Title: "Zebra Issue", State: "closed", Repository: "zebra/repo"}, Repository: pkg.RepositoryInfo{FullName: "zebra/repo"}, Type: "blocked_by"},
+			{Issue: pkg.Issue{Number: 1, Title: "Alpha Issue", State: "open", Repository: "alpha/repo"}, Repository: pkg.RepositoryInfo{FullName: "alpha/repo"}, Type: "blocked_by"},
+			{Issue: pkg.Issue{Number: 2, Title: "Beta Issue", State: "open", Repository: "beta/repo"}, Repository: pkg.RepositoryInfo{FullName: "beta/repo"}, Type: "blocked_by"},
 		},
 		Blocking: []pkg.DependencyRelation{
-			{Issue: pkg.Issue{Number: 30, Title: "Gamma Issue", State: "closed", Repository: "gamma/repo"}, Repository: "gamma/repo", Type: "blocks"},
-			{Issue: pkg.Issue{Number: 10, Title: "Delta Issue", State: "open", Repository: "delta/repo"}, Repository: "delta/repo", Type: "blocks"},
+			{Issue: pkg.Issue{Number: 30, Title: "Gamma Issue", State: "closed", Repository: "gamma/repo"}, Repository: pkg.RepositoryInfo{FullName: "gamma/repo"}, Type: "blocks"},
+			{Issue: pkg.Issue{Number: 10, Title: "Delta Issue", State: "open", Repository: "delta/repo"}, Repository: pkg.RepositoryInfo{FullName: "delta/repo"}, Type: "blocks"},
 		},
 		FetchedAt:  time.Now(),
 		TotalCount: 5,
 	}
 
 	tests := []struct {
-		name            string
-		sortOrder       string
-		expectedBlockedByOrder []int    // Expected issue numbers in order
-		expectedBlockingOrder  []int    // Expected issue numbers in order
+		name                   string
+		sortOrder              string
+		expectedBlockedByOrder []int // Expected issue numbers in order
+		expectedBlockingOrder  []int // Expected issue numbers in order
 	}{
 		{
-			name:            "sort by number (default)",
-			sortOrder:       "number",
+			name:                   "sort by number (default)",
+			sortOrder:              "number",
 			expectedBlockedByOrder: []int{3, 1, 2}, // Should maintain original API order
-			expectedBlockingOrder:  []int{30, 10}, // Should maintain original API order
+			expectedBlockingOrder:  []int{30, 10},  // Should maintain original API order
 		},
 		{
-			name:            "empty sort order defaults to number",
-			sortOrder:       "",
+			name:                   "empty sort order defaults to number",
+			sortOrder:              "",
 			expectedBlockedByOrder: []int{3, 1, 2}, // Should maintain original API order
-			expectedBlockingOrder:  []int{30, 10}, // Should maintain original API order
+			expectedBlockingOrder:  []int{30, 10},  // Should maintain original API order
 		},
 		{
-			name:            "sort by title",
-			sortOrder:       "title",
+			name:                   "sort by title",
+			sortOrder:              "title",
 			expectedBlockedByOrder: []int{1, 2, 3}, // Alpha, Beta, Zebra
-			expectedBlockingOrder:  []int{10, 30}, // Delta, Gamma
+			expectedBlockingOrder:  []int{10, 30},  // Delta, Gamma
 		},
 		{
-			name:            "sort by state",
-			sortOrder:       "state",
+			name:                   "sort by state",
+			sortOrder:              "state",
 			expectedBlockedByOrder: []int{1, 2, 3}, // open issues first, then closed
-			expectedBlockingOrder:  []int{10, 30}, // open first, then closed
+			expectedBlockingOrder:  []int{10, 30},  // open first, then closed
 		},
 		{
-			name:            "sort by repository",
-			sortOrder:       "repository",
+			name:                   "sort by repository",
+			sortOrder:              "repository",
 			expectedBlockedByOrder: []int{1, 2, 3}, // alpha, beta, zebra
-			expectedBlockingOrder:  []int{10, 30}, // delta, gamma
+			expectedBlockingOrder:  []int{10, 30},  // delta, gamma
 		},
 	}
 
@@ -271,9 +271,9 @@ func TestSortDependencySlice(t *testing.T) {
 	t.Run("sort by title", func(t *testing.T) {
 		testDeps := make([]pkg.DependencyRelation, len(deps))
 		copy(testDeps, deps)
-		
+
 		sortDependencySlice(testDeps, "title")
-		
+
 		assert.Equal(t, "Alice", testDeps[0].Issue.Title)
 		assert.Equal(t, "Bob", testDeps[1].Issue.Title)
 		assert.Equal(t, "Charlie", testDeps[2].Issue.Title)
@@ -282,9 +282,9 @@ func TestSortDependencySlice(t *testing.T) {
 	t.Run("sort by state", func(t *testing.T) {
 		testDeps := make([]pkg.DependencyRelation, len(deps))
 		copy(testDeps, deps)
-		
+
 		sortDependencySlice(testDeps, "state")
-		
+
 		// Open issues should come first (order 0), closed issues after (order 1)
 		assert.Equal(t, "open", testDeps[0].Issue.State)
 		assert.Equal(t, "open", testDeps[1].Issue.State)
@@ -294,9 +294,9 @@ func TestSortDependencySlice(t *testing.T) {
 	t.Run("sort by repository", func(t *testing.T) {
 		testDeps := make([]pkg.DependencyRelation, len(deps))
 		copy(testDeps, deps)
-		
+
 		sortDependencySlice(testDeps, "repository")
-		
+
 		assert.Equal(t, "alpha/repo", testDeps[0].Repository)
 		assert.Equal(t, "beta/repo", testDeps[1].Repository)
 		assert.Equal(t, "zebra/repo", testDeps[2].Repository)
@@ -305,9 +305,9 @@ func TestSortDependencySlice(t *testing.T) {
 	t.Run("sort by number", func(t *testing.T) {
 		testDeps := make([]pkg.DependencyRelation, len(deps))
 		copy(testDeps, deps)
-		
+
 		sortDependencySlice(testDeps, "number")
-		
+
 		assert.Equal(t, 1, testDeps[0].Issue.Number)
 		assert.Equal(t, 2, testDeps[1].Issue.Number)
 		assert.Equal(t, 3, testDeps[2].Issue.Number)
@@ -323,8 +323,8 @@ func TestStateOrder(t *testing.T) {
 		{"Open", 0}, // Case insensitive
 		{"OPEN", 0}, // Case insensitive
 		{"closed", 1},
-		{"Closed", 1}, // Case insensitive
-		{"CLOSED", 1}, // Case insensitive
+		{"Closed", 1},  // Case insensitive
+		{"CLOSED", 1},  // Case insensitive
 		{"unknown", 2}, // Unknown states get highest priority
 		{"", 2},        // Empty state gets highest priority
 	}
@@ -459,7 +459,7 @@ func TestListCommandValidation(t *testing.T) {
 			listSort = "number"
 			listDetailed = false
 			listJSON = ""
-			
+
 			// Set test values
 			if tt.format != "" {
 				listFormat = tt.format
@@ -641,7 +641,7 @@ func TestListCommandIntegration(t *testing.T) {
 // Benchmark tests for command performance
 func BenchmarkApplyStateFilter(b *testing.B) {
 	data := createTestDependencyData()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = applyStateFilter(data, "open")
@@ -650,7 +650,7 @@ func BenchmarkApplyStateFilter(b *testing.B) {
 
 func BenchmarkApplySorting(b *testing.B) {
 	data := createTestDependencyData()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = applySorting(data, "title")
@@ -659,7 +659,7 @@ func BenchmarkApplySorting(b *testing.B) {
 
 func BenchmarkParseJSONFields(b *testing.B) {
 	fieldsStr := "blocked_by,blocks,summary,source_issue"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = parseJSONFields(fieldsStr)
@@ -706,7 +706,7 @@ func TestEdgeCases(t *testing.T) {
 
 	t.Run("nil slice handling", func(t *testing.T) {
 		var deps []pkg.DependencyRelation
-		
+
 		// sortDependencySlice should handle nil/empty slices gracefully
 		sortDependencySlice(deps, "title")
 		assert.Equal(t, 0, len(deps))

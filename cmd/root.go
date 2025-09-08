@@ -80,7 +80,7 @@ func Execute() int {
 	if err := rootCmd.Execute(); err != nil {
 		// Use our structured error formatting for user-friendly messages
 		fmt.Fprintf(os.Stderr, "%s\n", pkg.FormatUserError(err))
-		
+
 		// Return appropriate exit codes based on error type
 		switch pkg.GetErrorType(err) {
 		case pkg.ErrorTypeAuthentication:

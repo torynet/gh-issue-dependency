@@ -21,10 +21,10 @@ type MockHTTPClient struct {
 }
 
 type MockRequest struct {
-	Method   string
-	URL      string
-	Body     string
-	Headers  map[string]string
+	Method  string
+	URL     string
+	Body    string
+	Headers map[string]string
 }
 
 type MockResponse struct {
@@ -45,9 +45,9 @@ func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	}
 
 	mockReq := MockRequest{
-		Method: req.Method,
-		URL:    req.URL.String(),
-		Body:   body,
+		Method:  req.Method,
+		URL:     req.URL.String(),
+		Body:    body,
 		Headers: make(map[string]string),
 	}
 
@@ -119,10 +119,10 @@ func (m *MockHTTPClient) Reset() {
 func TestDependencyRemoverGitHubAPIIntegration(t *testing.T) {
 	// Note: This test structure demonstrates the testing approach
 	// In a real implementation, we would need to inject the mock client into DependencyRemover
-	
+
 	t.Run("successful relationship existence verification", func(t *testing.T) {
 		mockClient := &MockHTTPClient{}
-		
+
 		// Mock response for dependency verification - issue has dependencies
 		dependencyData := `{
 			"source_issue": {
@@ -151,21 +151,21 @@ func TestDependencyRemoverGitHubAPIIntegration(t *testing.T) {
 			"total_count": 1,
 			"fetched_at": "2024-01-01T12:00:00Z"
 		}`
-		
+
 		mockClient.AddResponse(200, dependencyData)
-		
+
 		// Test relationship existence verification logic
 		source := CreateIssueRef("owner", "repo", 123)
 		target := CreateIssueRef("owner", "repo", 456)
-		
+
 		t.Logf("Testing relationship verification: %s blocked by %s", source.String(), target.String())
-		
+
 		// Verify request would be made to correct endpoint
 		expectedURL := "repos/owner/repo/issues/123/dependencies"
-		
+
 		assert.Contains(t, expectedURL, "repos/owner/repo/issues/123",
 			"Expected GitHub API endpoint for dependency fetching")
-		
+
 		// Verify mock response structure
 		assert.Contains(t, dependencyData, "blocked_by", "Response should contain blocked_by field")
 		assert.Contains(t, dependencyData, "456", "Response should contain target issue number")
@@ -173,11 +173,11 @@ func TestDependencyRemoverGitHubAPIIntegration(t *testing.T) {
 
 	t.Run("GitHub API error scenarios", func(t *testing.T) {
 		errorScenarios := []struct {
-			name               string
-			statusCode         int
-			responseBody       string
-			expectedErrorType  string
-			expectedRetry      bool
+			name              string
+			statusCode        int
+			responseBody      string
+			expectedErrorType string
+			expectedRetry     bool
 		}{
 			{
 				name:              "authentication error - 401",
@@ -234,14 +234,14 @@ func TestDependencyRemoverGitHubAPIIntegration(t *testing.T) {
 			t.Run(scenario.name, func(t *testing.T) {
 				mockClient := &MockHTTPClient{}
 				mockClient.AddResponse(scenario.statusCode, scenario.responseBody)
-				
+
 				t.Logf("Testing error scenario: %s (HTTP %d)", scenario.name, scenario.statusCode)
 				t.Logf("Expected error type: %s", scenario.expectedErrorType)
 				t.Logf("Should retry: %v", scenario.expectedRetry)
-				
+
 				// Verify error categorization logic
 				assert.Greater(t, scenario.statusCode, 399, "Should be an error status code")
-				
+
 				if scenario.statusCode == 401 {
 					assert.Equal(t, "authentication", scenario.expectedErrorType, "401 should be authentication error")
 				}
@@ -319,20 +319,20 @@ func TestDependencyRemoverGitHubAPIIntegration(t *testing.T) {
 			t.Run(scenario.name, func(t *testing.T) {
 				mockClient := &MockHTTPClient{}
 				mockClient.AddResponse(scenario.expectedStatusCode, scenario.responseBody)
-				
+
 				// Construct expected DELETE endpoint
 				relationshipID := fmt.Sprintf("%s#%d", scenario.target.String(), scenario.target.Number)
 				if scenario.target.FullName != "" {
 					relationshipID = scenario.target.String()
 				}
-				
+
 				expectedEndpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s",
 					scenario.source.Owner, scenario.source.Repo, scenario.source.Number, relationshipID)
-				
+
 				t.Logf("Testing deletion: %s %s %s", scenario.source.String(), scenario.relType, scenario.target.String())
 				t.Logf("Expected endpoint: DELETE %s", expectedEndpoint)
 				t.Logf("Expected status: %d", scenario.expectedStatusCode)
-				
+
 				// Verify endpoint construction
 				assert.Contains(t, expectedEndpoint, fmt.Sprintf("repos/%s/%s", scenario.source.Owner, scenario.source.Repo),
 					"Endpoint should contain source repository")
@@ -340,7 +340,7 @@ func TestDependencyRemoverGitHubAPIIntegration(t *testing.T) {
 					"Endpoint should contain source issue number")
 				assert.Contains(t, expectedEndpoint, "dependencies",
 					"Endpoint should contain dependencies path")
-				
+
 				// Verify success/failure categorization
 				if scenario.expectSuccess {
 					assert.Equal(t, 204, scenario.expectedStatusCode, "Successful deletion should return 204")
@@ -408,18 +408,18 @@ func TestDependencyRemoverGitHubAPIIntegration(t *testing.T) {
 						mockClient.AddResponse(resp.StatusCode, resp.Body)
 					}
 				}
-				
+
 				t.Logf("Testing retry scenario: %s", scenario.name)
 				t.Logf("Expected retries: %d", scenario.expectedRetryCount)
 				t.Logf("Expected final result: %v", scenario.expectedFinalResult)
-				
+
 				// Test retry logic parameters
 				maxRetries := 3
 				baseDelay := 1 * time.Second
-				
+
 				assert.LessOrEqual(t, scenario.expectedRetryCount, maxRetries,
 					"Retry count should not exceed maximum")
-				
+
 				// Test exponential backoff calculation
 				for attempt := 1; attempt <= scenario.expectedRetryCount; attempt++ {
 					delay := time.Duration(attempt) * baseDelay
@@ -427,11 +427,11 @@ func TestDependencyRemoverGitHubAPIIntegration(t *testing.T) {
 					assert.Equal(t, expectedDelay, delay,
 						"Retry delay should follow exponential backoff pattern")
 				}
-				
+
 				// Verify the number of configured responses matches expected behavior
 				responseCount := len(scenario.responses)
 				if scenario.expectedFinalResult {
-					assert.LessOrEqual(t, scenario.expectedRetryCount + 1, responseCount,
+					assert.LessOrEqual(t, scenario.expectedRetryCount+1, responseCount,
 						"Should have enough responses for retries + final success")
 				}
 			})
@@ -448,27 +448,27 @@ func TestBatchDependencyRemoval(t *testing.T) {
 			CreateIssueRef("owner", "repo", 789),
 			CreateIssueRef("other", "repo", 101),
 		}
-		
+
 		// Mock successful responses for each deletion
 		mockClient := &MockHTTPClient{}
 		for _, target := range targets {
 			mockClient.AddResponse(204, "")
 		}
-		
+
 		t.Logf("Testing batch removal: %s removes %d dependencies", source.String(), len(targets))
-		
+
 		// Verify each target would get its own DELETE request
 		for i, target := range targets {
 			relationshipID := target.String()
 			expectedEndpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s",
 				source.Owner, source.Repo, source.Number, relationshipID)
-			
+
 			t.Logf("Batch item %d: DELETE %s", i+1, expectedEndpoint)
-			
+
 			assert.Contains(t, expectedEndpoint, "dependencies",
 				"Each batch item should target dependencies endpoint")
 		}
-		
+
 		// Verify cross-repository handling
 		crossRepoTarget := targets[2] // other/repo#101
 		assert.NotEqual(t, source.Owner, crossRepoTarget.Owner,
@@ -482,35 +482,35 @@ func TestBatchDependencyRemoval(t *testing.T) {
 			CreateIssueRef("owner", "repo", 789), // Failure - not found
 			CreateIssueRef("owner", "repo", 101), // Success
 		}
-		
+
 		mockClient := &MockHTTPClient{}
-		mockClient.AddResponse(204, "")                                              // Success
-		mockClient.AddResponse(404, `{"message": "Dependency not found"}`)          // Failure
-		mockClient.AddResponse(204, "")                                              // Success
-		
+		mockClient.AddResponse(204, "")                                    // Success
+		mockClient.AddResponse(404, `{"message": "Dependency not found"}`) // Failure
+		mockClient.AddResponse(204, "")                                    // Success
+
 		t.Logf("Testing partial batch failure scenario")
-		
+
 		expectedResults := []struct {
-			target    IssueRef
-			success   bool
+			target     IssueRef
+			success    bool
 			statusCode int
 		}{
 			{targets[0], true, 204},
 			{targets[1], false, 404},
 			{targets[2], true, 204},
 		}
-		
+
 		for i, expected := range expectedResults {
 			t.Logf("Expected result %d: %s -> success=%v (status=%d)",
 				i+1, expected.target.String(), expected.success, expected.statusCode)
-			
+
 			if expected.success {
 				assert.Equal(t, 204, expected.statusCode, "Success should be 204")
 			} else {
 				assert.Greater(t, expected.statusCode, 399, "Failure should be error status")
 			}
 		}
-		
+
 		// Verify that partial failures are reported properly
 		successCount := 0
 		failureCount := 0
@@ -521,19 +521,19 @@ func TestBatchDependencyRemoval(t *testing.T) {
 				failureCount++
 			}
 		}
-		
+
 		assert.Equal(t, 2, successCount, "Should have 2 successes")
 		assert.Equal(t, 1, failureCount, "Should have 1 failure")
-		assert.Equal(t, len(targets), successCount + failureCount, "All operations should be accounted for")
+		assert.Equal(t, len(targets), successCount+failureCount, "All operations should be accounted for")
 	})
 }
 
 // TestCrossRepositoryDependencyRemoval tests cross-repository scenarios
 func TestCrossRepositoryDependencyRemoval(t *testing.T) {
 	scenarios := []struct {
-		name   string
-		source IssueRef
-		target IssueRef
+		name    string
+		source  IssueRef
+		target  IssueRef
 		relType string
 	}{
 		{
@@ -560,25 +560,25 @@ func TestCrossRepositoryDependencyRemoval(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			mockClient := &MockHTTPClient{}
 			mockClient.AddResponse(204, "")
-			
+
 			// Verify cross-repository detection
 			isCrossRepo := (scenario.source.Owner != scenario.target.Owner) ||
-							(scenario.source.Repo != scenario.target.Repo)
-			
+				(scenario.source.Repo != scenario.target.Repo)
+
 			assert.True(t, isCrossRepo, "Scenario should be cross-repository")
-			
+
 			t.Logf("Cross-repo removal: %s %s %s",
 				scenario.source.String(), scenario.relType, scenario.target.String())
-			
+
 			// Verify endpoint construction for cross-repository
 			relationshipID := scenario.target.String()
 			expectedEndpoint := fmt.Sprintf("repos/%s/%s/issues/%d/dependencies/%s",
 				scenario.source.Owner, scenario.source.Repo, scenario.source.Number, relationshipID)
-			
+
 			t.Logf("Expected endpoint: DELETE %s", expectedEndpoint)
-			
+
 			// Cross-repository deletions should still use the source repository endpoint
-			assert.Contains(t, expectedEndpoint, scenario.source.Owner + "/" + scenario.source.Repo,
+			assert.Contains(t, expectedEndpoint, scenario.source.Owner+"/"+scenario.source.Repo,
 				"Cross-repo deletion should use source repository endpoint")
 			assert.Contains(t, expectedEndpoint, scenario.target.String(),
 				"Cross-repo deletion should reference target in relationship ID")
@@ -590,43 +590,43 @@ func TestCrossRepositoryDependencyRemoval(t *testing.T) {
 func TestAPIRateLimitHandling(t *testing.T) {
 	t.Run("rate limit with retry-after header", func(t *testing.T) {
 		mockClient := &MockHTTPClient{}
-		
+
 		// First response: rate limited with Retry-After header
 		rateLimitResp := MockResponse{
 			StatusCode: 429,
 			Body:       `{"message": "API rate limit exceeded for user"}`,
 			Headers:    map[string]string{"Retry-After": "60"},
 		}
-		
+
 		// Second response: success
 		successResp := MockResponse{
 			StatusCode: 204,
 			Body:       "",
 		}
-		
+
 		mockClient.responses = []MockResponse{rateLimitResp, successResp}
-		
+
 		t.Logf("Testing rate limit handling with Retry-After header")
-		
+
 		// Simulate making the requests
 		for i, expectedResp := range []MockResponse{rateLimitResp, successResp} {
 			req, _ := http.NewRequest("DELETE", "https://api.github.com/test", nil)
 			resp, err := mockClient.Do(req)
-			
+
 			require.NoError(t, err, "Mock client should not error")
 			assert.Equal(t, expectedResp.StatusCode, resp.StatusCode,
 				"Response %d status should match", i+1)
-			
+
 			if resp.StatusCode == 429 {
 				retryAfter := resp.Header.Get("Retry-After")
 				assert.Equal(t, "60", retryAfter, "Retry-After header should be preserved")
-				
+
 				t.Logf("Request %d: Rate limited, retry after %s seconds", i+1, retryAfter)
 			} else {
 				t.Logf("Request %d: Success", i+1)
 			}
 		}
-		
+
 		requests := mockClient.GetRequests()
 		assert.Len(t, requests, 2, "Should have made 2 requests (retry after rate limit)")
 	})
@@ -635,27 +635,27 @@ func TestAPIRateLimitHandling(t *testing.T) {
 		mockClient := &MockHTTPClient{}
 		mockClient.AddResponse(429, `{"message": "API rate limit exceeded"}`)
 		mockClient.AddResponse(204, "")
-		
+
 		t.Logf("Testing rate limit handling without Retry-After header")
-		
+
 		// First request - rate limited
 		req1, _ := http.NewRequest("DELETE", "https://api.github.com/test", nil)
 		resp1, err := mockClient.Do(req1)
 		require.NoError(t, err)
 		assert.Equal(t, 429, resp1.StatusCode)
-		
+
 		// Should use exponential backoff when no Retry-After header
 		baseDelay := 1 * time.Second
 		exponentialDelay := baseDelay * 2 // First retry
-		
+
 		t.Logf("Rate limited without Retry-After, using exponential backoff: %v", exponentialDelay)
-		
+
 		// Second request - success
 		req2, _ := http.NewRequest("DELETE", "https://api.github.com/test", nil)
 		resp2, err := mockClient.Do(req2)
 		require.NoError(t, err)
 		assert.Equal(t, 204, resp2.StatusCode)
-		
+
 		requests := mockClient.GetRequests()
 		assert.Len(t, requests, 2, "Should have made 2 requests")
 	})
@@ -690,22 +690,22 @@ func TestNetworkErrorHandling(t *testing.T) {
 			mockClient := &MockHTTPClient{}
 			mockClient.AddErrorResponse(scenario.error)
 			mockClient.AddResponse(204, "") // Success after retry
-			
+
 			t.Logf("Testing network error: %s", scenario.name)
-			
+
 			// First request - network error
 			req1, _ := http.NewRequest("DELETE", "https://api.github.com/test", nil)
 			_, err := mockClient.Do(req1)
 			assert.Error(t, err, "Should return network error")
 			assert.Contains(t, err.Error(), strings.Split(scenario.error.Error(), ":")[0],
 				"Error should contain expected network error type")
-			
+
 			// Second request - success (after retry)
 			req2, _ := http.NewRequest("DELETE", "https://api.github.com/test", nil)
 			resp, err := mockClient.Do(req2)
 			require.NoError(t, err, "Retry should succeed")
 			assert.Equal(t, 204, resp.StatusCode, "Retry should return success")
-			
+
 			t.Logf("Network error resolved on retry")
 		})
 	}
@@ -759,20 +759,20 @@ func TestGitHubAPIResponseParsing(t *testing.T) {
 			"total_count": 2,
 			"fetched_at": "2024-01-01T12:00:00Z"
 		}`
-		
+
 		t.Logf("Testing dependency data response parsing")
-		
+
 		// Verify response contains expected fields
 		assert.Contains(t, responseBody, "source_issue", "Response should contain source_issue")
 		assert.Contains(t, responseBody, "blocked_by", "Response should contain blocked_by")
 		assert.Contains(t, responseBody, "blocking", "Response should contain blocking")
 		assert.Contains(t, responseBody, "total_count", "Response should contain total_count")
-		
+
 		// Verify issue numbers are present
 		assert.Contains(t, responseBody, "123", "Response should contain source issue number")
 		assert.Contains(t, responseBody, "456", "Response should contain blocked_by issue number")
 		assert.Contains(t, responseBody, "789", "Response should contain blocking issue number")
-		
+
 		// Verify repository information
 		assert.Contains(t, responseBody, "owner/repo", "Response should contain repository names")
 		assert.Contains(t, responseBody, "other/repo", "Response should contain cross-repo references")
@@ -815,21 +815,21 @@ func TestGitHubAPIResponseParsing(t *testing.T) {
 			t.Run(scenario.name, func(t *testing.T) {
 				mockClient := &MockHTTPClient{}
 				mockClient.AddResponse(scenario.status, scenario.body)
-				
+
 				req, _ := http.NewRequest("DELETE", "https://api.github.com/test", nil)
 				resp, err := mockClient.Do(req)
-				
+
 				require.NoError(t, err, "Mock client should not error")
 				assert.Equal(t, scenario.status, resp.StatusCode, "Status should match")
-				
+
 				// Read and verify response body
 				bodyBytes, err := io.ReadAll(resp.Body)
 				require.NoError(t, err, "Should read response body")
-				
+
 				bodyStr := string(bodyBytes)
 				assert.Contains(t, bodyStr, scenario.errorMsg, "Response should contain expected error message")
 				assert.Contains(t, bodyStr, "documentation_url", "Error response should contain documentation URL")
-				
+
 				t.Logf("Error response parsed: %s (HTTP %d)", scenario.errorMsg, scenario.status)
 			})
 		}

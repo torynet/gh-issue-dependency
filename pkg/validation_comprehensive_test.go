@@ -319,11 +319,11 @@ func TestParseIssueRefWithRepo(t *testing.T) {
 			expectError:  true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := ParseIssueRefWithRepo(tt.issueRef, tt.defaultOwner, tt.defaultRepo)
-			
+
 			if tt.expectError {
 				require.Error(t, err, "Expected error but got none")
 			} else {
@@ -448,7 +448,7 @@ func TestIssueRefString(t *testing.T) {
 			expected: "owner/repo#999999",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.ref.String()
@@ -509,66 +509,66 @@ func TestRelationshipExistsInData(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		data       *DependencyData
-		target     IssueRef
-		relType    string
-		expected   bool
+		name     string
+		data     *DependencyData
+		target   IssueRef
+		relType  string
+		expected bool
 	}{
 		{
-			name:   "existing blocked-by relationship - same repo",
-			data:   testData,
-			target: CreateIssueRef("owner", "repo", 456),
-			relType: "blocked-by",
+			name:     "existing blocked-by relationship - same repo",
+			data:     testData,
+			target:   CreateIssueRef("owner", "repo", 456),
+			relType:  "blocked-by",
 			expected: true,
 		},
 		{
-			name:   "existing blocked-by relationship - cross repo",
-			data:   testData,
-			target: CreateIssueRef("other", "repo", 789),
-			relType: "blocked-by",
+			name:     "existing blocked-by relationship - cross repo",
+			data:     testData,
+			target:   CreateIssueRef("other", "repo", 789),
+			relType:  "blocked-by",
 			expected: true,
 		},
 		{
-			name:   "existing blocks relationship",
-			data:   testData,
-			target: CreateIssueRef("owner", "repo", 101),
-			relType: "blocks",
+			name:     "existing blocks relationship",
+			data:     testData,
+			target:   CreateIssueRef("owner", "repo", 101),
+			relType:  "blocks",
 			expected: true,
 		},
 		{
-			name:   "non-existing blocked-by relationship",
-			data:   testData,
-			target: CreateIssueRef("owner", "repo", 999),
-			relType: "blocked-by",
+			name:     "non-existing blocked-by relationship",
+			data:     testData,
+			target:   CreateIssueRef("owner", "repo", 999),
+			relType:  "blocked-by",
 			expected: false,
 		},
 		{
-			name:   "non-existing blocks relationship",
-			data:   testData,
-			target: CreateIssueRef("owner", "repo", 999),
-			relType: "blocks",
+			name:     "non-existing blocks relationship",
+			data:     testData,
+			target:   CreateIssueRef("owner", "repo", 999),
+			relType:  "blocks",
 			expected: false,
 		},
 		{
-			name:   "wrong relationship type - blocks for blocked-by target",
-			data:   testData,
-			target: CreateIssueRef("owner", "repo", 456),
-			relType: "blocks",
+			name:     "wrong relationship type - blocks for blocked-by target",
+			data:     testData,
+			target:   CreateIssueRef("owner", "repo", 456),
+			relType:  "blocks",
 			expected: false,
 		},
 		{
-			name:   "wrong relationship type - blocked-by for blocks target",
-			data:   testData,
-			target: CreateIssueRef("owner", "repo", 101),
-			relType: "blocked-by",
+			name:     "wrong relationship type - blocked-by for blocks target",
+			data:     testData,
+			target:   CreateIssueRef("owner", "repo", 101),
+			relType:  "blocked-by",
 			expected: false,
 		},
 		{
-			name:   "nil data",
-			data:   nil,
-			target: CreateIssueRef("owner", "repo", 456),
-			relType: "blocked-by",
+			name:     "nil data",
+			data:     nil,
+			target:   CreateIssueRef("owner", "repo", 456),
+			relType:  "blocked-by",
 			expected: false,
 		},
 		{
@@ -598,12 +598,12 @@ func TestCreateRelationshipNotFoundError(t *testing.T) {
 	v := &RemovalValidator{}
 
 	tests := []struct {
-		name              string
-		source            IssueRef
-		target            IssueRef
-		relType           string
-		expectedErrMsg    string
-		expectedErrType   ErrorType
+		name            string
+		source          IssueRef
+		target          IssueRef
+		relType         string
+		expectedErrMsg  string
+		expectedErrType ErrorType
 	}{
 		{
 			name:            "blocked-by relationship not found",
@@ -638,7 +638,7 @@ func TestCreateRelationshipNotFoundError(t *testing.T) {
 			require.Error(t, err, "Should return an error")
 			assert.Contains(t, err.Error(), tt.expectedErrMsg,
 				"Error message should contain expected text")
-			
+
 			// Check if it's an AppError and has the correct type
 			if appErr, ok := err.(*AppError); ok {
 				assert.Equal(t, tt.expectedErrType, appErr.Type,
@@ -716,9 +716,9 @@ func TestValidationResult(t *testing.T) {
 		{
 			name: "valid result",
 			result: ValidationResult{
-				Valid: true,
-				Error: nil,
-				Issues: []ValidationIssue{},
+				Valid:       true,
+				Error:       nil,
+				Issues:      []ValidationIssue{},
 				Suggestions: []string{},
 			},
 			expected: true,
@@ -730,9 +730,9 @@ func TestValidationResult(t *testing.T) {
 				Error: fmt.Errorf("validation error"),
 				Issues: []ValidationIssue{
 					{
-						Type:    "error",
-						Message: "Test error",
-						IssueRef: CreateIssueRef("owner", "repo", 123),
+						Type:        "error",
+						Message:     "Test error",
+						IssueRef:    CreateIssueRef("owner", "repo", 123),
 						Suggestions: []string{"Fix the error"},
 					},
 				},
@@ -743,9 +743,9 @@ func TestValidationResult(t *testing.T) {
 		{
 			name: "valid result with suggestions",
 			result: ValidationResult{
-				Valid: true,
-				Error: nil,
-				Issues: []ValidationIssue{},
+				Valid:       true,
+				Error:       nil,
+				Issues:      []ValidationIssue{},
 				Suggestions: []string{"Consider this improvement"},
 			},
 			expected: true,
@@ -755,12 +755,12 @@ func TestValidationResult(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.result.Valid, "Valid field should match")
-			
+
 			if !tt.expected {
 				assert.Error(t, tt.result.Error, "Should have an error when invalid")
 				assert.NotEmpty(t, tt.result.Issues, "Should have validation issues when invalid")
 			}
-			
+
 			if len(tt.result.Suggestions) > 0 {
 				assert.NotEmpty(t, tt.result.Suggestions[0], "Suggestions should not be empty")
 			}
@@ -806,13 +806,13 @@ func TestValidationIssue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.NotEmpty(t, tt.issue.Type, "Type should not be empty")
 			assert.NotEmpty(t, tt.issue.Message, "Message should not be empty")
-			
+
 			// If IssueRef is set, validate its string representation
 			if tt.issue.IssueRef.Number > 0 {
 				issueStr := tt.issue.IssueRef.String()
 				assert.Contains(t, issueStr, "#", "Issue string should contain #")
 			}
-			
+
 			// If suggestions exist, validate they're not empty
 			for i, suggestion := range tt.issue.Suggestions {
 				assert.NotEmpty(t, suggestion, "Suggestion %d should not be empty", i)
@@ -874,19 +874,19 @@ func TestValidationErrorScenarios(t *testing.T) {
 				},
 			},
 		}
-		
+
 		for _, scenario := range scenarios {
 			t.Run(scenario.name, func(t *testing.T) {
 				err := scenario.setupError()
-				
+
 				require.Error(t, err, "Scenario should produce an error")
-				
+
 				// Check error type if it's an AppError
 				if appErr, ok := err.(*AppError); ok {
 					assert.Equal(t, scenario.errorType, appErr.Type,
 						"Error type should match expected for: %s", scenario.name)
 				}
-				
+
 				t.Logf("Scenario: %s - %s", scenario.name, scenario.description)
 				t.Logf("Expected error type: %v", scenario.errorType)
 				t.Logf("Actual error: %v", err)
@@ -898,25 +898,25 @@ func TestValidationErrorScenarios(t *testing.T) {
 // Example usage patterns for integration with cmd/remove.go
 func ExampleRemovalValidator_ValidateRemoval() {
 	// This example shows how to use the validator in the remove command
-	
+
 	// 1. Create validator (would require GitHub CLI auth in real usage)
 	// validator, err := NewRemovalValidator()
 	// if err != nil {
 	// 	fmt.Printf("Failed to create validator: %v\n", err)
 	// 	return
 	// }
-	
+
 	// 2. Parse issue references
 	source := CreateIssueRef("owner", "repo", 123)
 	target := CreateIssueRef("owner", "repo", 456)
-	
+
 	// 3. Validate removal (would require API calls in real usage)
 	// err = validator.ValidateRemoval(source, target, "blocked-by")
 	// if err != nil {
 	// 	fmt.Printf("Validation failed: %v\n", err)
 	// 	return
 	// }
-	
+
 	fmt.Printf("Validation example: %s -> %s (blocked-by)\n", source.String(), target.String())
 	// Output: Validation example: owner/repo#123 -> owner/repo#456 (blocked-by)
 }
@@ -928,20 +928,20 @@ func ExampleRemovalValidator_ValidateBatchRemoval() {
 	// 	fmt.Printf("Failed to create validator: %v\n", err)
 	// 	return
 	// }
-	
+
 	source := CreateIssueRef("owner", "repo", 123)
 	targets := []IssueRef{
 		CreateIssueRef("owner", "repo", 456),
 		CreateIssueRef("owner", "repo", 789),
 		CreateIssueRef("other", "repo", 101),
 	}
-	
+
 	// err = validator.ValidateBatchRemoval(source, targets, "blocks")
 	// if err != nil {
 	// 	fmt.Printf("Batch validation failed: %v\n", err)
 	// 	return
 	// }
-	
+
 	fmt.Printf("Batch validation example: %s blocks %d issues\n", source.String(), len(targets))
 	// Output: Batch validation example: owner/repo#123 blocks 3 issues
 }

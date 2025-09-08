@@ -43,7 +43,7 @@ func NewRemovalValidator() (*RemovalValidator, error) {
 // IssueRef represents a reference to a GitHub issue
 type IssueRef struct {
 	Owner  string
-	Repo   string  
+	Repo   string
 	Number int
 	// FullName returns the full repository name (owner/repo)
 	FullName string
@@ -127,7 +127,7 @@ func (v *RemovalValidator) ValidateBatchRemoval(source IssueRef, targets []Issue
 	for _, target := range targets {
 		// Validate target issue accessibility
 		if err := v.validateSingleIssueAccess(target); err != nil {
-			validationErrors = append(validationErrors, 
+			validationErrors = append(validationErrors,
 				fmt.Sprintf("Target issue %s: %v", target.String(), err))
 			continue
 		}
@@ -135,12 +135,12 @@ func (v *RemovalValidator) ValidateBatchRemoval(source IssueRef, targets []Issue
 		// Verify relationship exists
 		exists, err := v.VerifyRelationshipExists(source, target, relType)
 		if err != nil {
-			validationErrors = append(validationErrors, 
+			validationErrors = append(validationErrors,
 				fmt.Sprintf("Relationship verification failed for %s: %v", target.String(), err))
 			continue
 		}
 		if !exists {
-			validationErrors = append(validationErrors, 
+			validationErrors = append(validationErrors,
 				fmt.Sprintf("No %s relationship found between %s and %s", relType, source.String(), target.String()))
 		}
 	}
@@ -181,7 +181,7 @@ func (v *RemovalValidator) validateInputs(source, target IssueRef, relType strin
 		return NewEmptyValueError("source issue reference")
 	}
 
-	// Validate target issue reference  
+	// Validate target issue reference
 	if target.Owner == "" || target.Repo == "" || target.Number <= 0 {
 		return NewEmptyValueError("target issue reference")
 	}
@@ -233,7 +233,7 @@ func (v *RemovalValidator) validatePermissions(source IssueRef) error {
 func (v *RemovalValidator) validateWritePermissions(ref IssueRef) error {
 	// Check repository permissions via API
 	endpoint := fmt.Sprintf("repos/%s/%s", ref.Owner, ref.Repo)
-	
+
 	var repoData struct {
 		Permissions struct {
 			Push  bool `json:"push"`
@@ -249,7 +249,7 @@ func (v *RemovalValidator) validateWritePermissions(ref IssueRef) error {
 
 	// Check if user has push or admin permissions (required for dependency modification)
 	if !repoData.Permissions.Push && !repoData.Permissions.Admin {
-		return NewPermissionDeniedError("modify dependencies", 
+		return NewPermissionDeniedError("modify dependencies",
 			fmt.Sprintf("%s/%s", ref.Owner, ref.Repo))
 	}
 
@@ -298,12 +298,12 @@ func (v *RemovalValidator) relationshipExistsInData(data *DependencyData, target
 	}
 
 	var relationsToCheck []DependencyRelation
-	
+
 	switch relType {
 	case "blocked-by":
 		// For blocked-by relationship, check the BlockedBy list
 		relationsToCheck = data.BlockedBy
-	case "blocks": 
+	case "blocks":
 		// For blocks relationship, check the Blocking list
 		relationsToCheck = data.Blocking
 	}
@@ -317,9 +317,9 @@ func (v *RemovalValidator) relationshipExistsInData(data *DependencyData, target
 			if target.FullName != "" {
 				targetRepo = target.FullName
 			}
-			
-			if relation.Repository == targetRepo || 
-			   relation.Issue.Repository.FullName == targetRepo {
+
+			if relation.Repository == targetRepo ||
+				relation.Issue.Repository.FullName == targetRepo {
 				return true
 			}
 		}
@@ -368,7 +368,7 @@ func ParseIssueRefWithRepo(issueRefStr, defaultOwner, defaultRepo string) (Issue
 	if repo == "" {
 		return IssueRef{
 			Owner:  defaultOwner,
-			Repo:   defaultRepo, 
+			Repo:   defaultRepo,
 			Number: issueNum,
 		}, nil
 	}

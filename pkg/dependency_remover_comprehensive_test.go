@@ -145,7 +145,7 @@ func TestRemoveRelationshipValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Logf("Testing validation: %s %s %s", 
+			t.Logf("Testing validation: %s %s %s",
 				tt.source.String(), tt.relType, tt.target.String())
 
 			// Simulate validation result
@@ -175,12 +175,12 @@ func TestRemoveRelationshipValidation(t *testing.T) {
 // TestDryRunPreview tests dry run mode output and behavior
 func TestDryRunPreview(t *testing.T) {
 	tests := []struct {
-		name            string
-		source          IssueRef
-		target          IssueRef
-		relType         string
-		expectedOutput  []string
-		shouldExecute   bool
+		name           string
+		source         IssueRef
+		target         IssueRef
+		relType        string
+		expectedOutput []string
+		shouldExecute  bool
 	}{
 		{
 			name:    "dry run blocked-by preview",
@@ -239,7 +239,7 @@ func TestDryRunPreview(t *testing.T) {
 
 			// Verify behavior characteristics
 			assert.False(t, tt.shouldExecute, "Dry run should not execute deletion")
-			
+
 			// Verify relationship symbols
 			if tt.relType == "blocked-by" {
 				assert.Contains(t, output, "←", "Blocked-by should use ← arrow")
@@ -257,7 +257,7 @@ func generateDryRunOutput(source, target IssueRef, relType string) string {
 	var output strings.Builder
 
 	output.WriteString("Dry run: dependency removal preview\n\n")
-	
+
 	var relationshipDescription string
 	switch relType {
 	case "blocked-by":
@@ -265,11 +265,11 @@ func generateDryRunOutput(source, target IssueRef, relType string) string {
 	case "blocks":
 		relationshipDescription = fmt.Sprintf("blocks relationship: %s → %s", source.String(), target.String())
 	}
-	
+
 	output.WriteString("Would remove:\n")
 	output.WriteString(fmt.Sprintf("  ❌ %s\n", relationshipDescription))
 	output.WriteString("\nNo changes made. Use --force to skip confirmation or remove --dry-run to execute.\n")
-	
+
 	return output.String()
 }
 
@@ -380,7 +380,7 @@ func TestDeleteRelationshipRetryLogic(t *testing.T) {
 
 			for attempt := 1; attempt <= tt.maxRetries; attempt++ {
 				attempts++
-				
+
 				// Get the error for this attempt
 				var err error
 				if attempt <= len(tt.mockErrors) {
@@ -422,7 +422,7 @@ func TestDeleteRelationshipRetryLogic(t *testing.T) {
 			// Verify retry behavior
 			if tt.expectedFinalError {
 				require.Error(t, finalError, "Expected final error")
-				
+
 				if appErr, ok := finalError.(*AppError); ok {
 					assert.Equal(t, tt.expectedErrorType, appErr.Type,
 						"Error type should match expected")
@@ -451,9 +451,9 @@ func isErrorRetryable(err error) bool {
 		// Rate limits and server errors are retryable
 		errMsg := strings.ToLower(err.Error())
 		return strings.Contains(errMsg, "rate limit") ||
-			   strings.Contains(errMsg, "500") ||
-			   strings.Contains(errMsg, "502") ||
-			   strings.Contains(errMsg, "503")
+			strings.Contains(errMsg, "500") ||
+			strings.Contains(errMsg, "502") ||
+			strings.Contains(errMsg, "503")
 	}
 
 	return false
@@ -534,7 +534,7 @@ func TestBatchRemovalOperations(t *testing.T) {
 			relType: "blocks",
 			mockResults: []error{
 				nil, // Success
-				NewAppError(ErrorTypeIssue, "Relationship not found", nil), // Not found
+				NewAppError(ErrorTypeIssue, "Relationship not found", nil),      // Not found
 				NewPermissionDeniedError("modify dependencies", "private/repo"), // Permission
 			},
 			expectedSuccesses: 1,
@@ -573,12 +573,12 @@ func TestBatchRemovalOperations(t *testing.T) {
 
 			if tt.expectedError {
 				assert.NotEmpty(t, errors, "Should have errors for partial/complete failure")
-				
+
 				// Simulate the error message construction
-				errorMsg := fmt.Sprintf("Batch removal partially failed: %d succeeded, %d failed", 
+				errorMsg := fmt.Sprintf("Batch removal partially failed: %d succeeded, %d failed",
 					successCount, len(errors))
-				
-				assert.Contains(t, errorMsg, "partially failed", 
+
+				assert.Contains(t, errorMsg, "partially failed",
 					"Error message should indicate partial failure")
 			} else {
 				assert.Empty(t, errors, "Should have no errors for complete success")
@@ -592,31 +592,31 @@ func TestBatchRemovalOperations(t *testing.T) {
 // TestCrossRepositoryRemoval tests cross-repository dependency removal
 func TestCrossRepositoryRemoval(t *testing.T) {
 	tests := []struct {
-		name                  string
-		source                IssueRef
-		target                IssueRef
-		relType               string
-		sourceRepoAccess      error
-		targetRepoAccess      error
-		expectedValidation    bool
-		expectedErrorMsg      string
+		name               string
+		source             IssueRef
+		target             IssueRef
+		relType            string
+		sourceRepoAccess   error
+		targetRepoAccess   error
+		expectedValidation bool
+		expectedErrorMsg   string
 	}{
 		{
-			name:             "successful cross-repo removal - both accessible",
-			source:           CreateIssueRef("owner1", "repo1", 123),
-			target:           CreateIssueRef("owner2", "repo2", 456),
-			relType:          "blocked-by",
-			sourceRepoAccess: nil,
-			targetRepoAccess: nil,
+			name:               "successful cross-repo removal - both accessible",
+			source:             CreateIssueRef("owner1", "repo1", 123),
+			target:             CreateIssueRef("owner2", "repo2", 456),
+			relType:            "blocked-by",
+			sourceRepoAccess:   nil,
+			targetRepoAccess:   nil,
 			expectedValidation: true,
 		},
 		{
-			name:             "same repo removal - target validation skipped",
-			source:           CreateIssueRef("owner", "repo", 123),
-			target:           CreateIssueRef("owner", "repo", 456),
-			relType:          "blocks",
-			sourceRepoAccess: nil,
-			targetRepoAccess: nil, // Should not be checked for same repo
+			name:               "same repo removal - target validation skipped",
+			source:             CreateIssueRef("owner", "repo", 123),
+			target:             CreateIssueRef("owner", "repo", 456),
+			relType:            "blocks",
+			sourceRepoAccess:   nil,
+			targetRepoAccess:   nil, // Should not be checked for same repo
 			expectedValidation: true,
 		},
 		{
@@ -657,7 +657,7 @@ func TestCrossRepositoryRemoval(t *testing.T) {
 				tt.source.String(), tt.target.String())
 
 			// Simulate cross-repository validation
-			err := validateCrossRepoPermissions(tt.source, tt.target, 
+			err := validateCrossRepoPermissions(tt.source, tt.target,
 				tt.sourceRepoAccess, tt.targetRepoAccess)
 
 			if tt.expectedValidation {
@@ -671,9 +671,9 @@ func TestCrossRepositoryRemoval(t *testing.T) {
 			}
 
 			// Verify cross-repository detection
-			isCrossRepo := (tt.source.Owner != tt.target.Owner) || 
-						   (tt.source.Repo != tt.target.Repo)
-			
+			isCrossRepo := (tt.source.Owner != tt.target.Owner) ||
+				(tt.source.Repo != tt.target.Repo)
+
 			if isCrossRepo {
 				assert.NotEqual(t, tt.source.String(), tt.target.String(),
 					"Cross-repo issues should have different identifiers")
@@ -691,28 +691,28 @@ func validateCrossRepoPermissions(source, target IssueRef, sourceErr, targetErr 
 	if sourceErr != nil {
 		return fmt.Errorf("source repository access failed: %w", sourceErr)
 	}
-	
+
 	// Validate target repository permissions (for cross-repo dependencies)
 	if source.Owner != target.Owner || source.Repo != target.Repo {
 		if targetErr != nil {
 			return fmt.Errorf("target repository access failed: %w", targetErr)
 		}
 	}
-	
+
 	return nil
 }
 
 // TestRemoveAllRelationships tests comprehensive removal of all dependencies
 func TestRemoveAllRelationships(t *testing.T) {
 	tests := []struct {
-		name                string
-		issue               IssueRef
-		mockDependencies    *DependencyData
-		opts                RemoveOptions
-		expectedRemovals    int
-		expectedBlockedBy   int
-		expectedBlocking    int
-		expectError         bool
+		name              string
+		issue             IssueRef
+		mockDependencies  *DependencyData
+		opts              RemoveOptions
+		expectedRemovals  int
+		expectedBlockedBy int
+		expectedBlocking  int
+		expectError       bool
 	}{
 		{
 			name:  "remove all - has both blocked-by and blocking",
@@ -728,11 +728,11 @@ func TestRemoveAllRelationships(t *testing.T) {
 				},
 				TotalCount: 3,
 			},
-			opts:             RemoveOptions{DryRun: false, Force: true},
-			expectedRemovals: 3,
+			opts:              RemoveOptions{DryRun: false, Force: true},
+			expectedRemovals:  3,
 			expectedBlockedBy: 2,
-			expectedBlocking: 1,
-			expectError:      false,
+			expectedBlocking:  1,
+			expectError:       false,
 		},
 		{
 			name:  "remove all - only blocked-by relationships",
@@ -747,29 +747,29 @@ func TestRemoveAllRelationships(t *testing.T) {
 				Blocking:   []DependencyRelation{},
 				TotalCount: 3,
 			},
-			opts:             RemoveOptions{DryRun: false, Force: true},
-			expectedRemovals: 3,
+			opts:              RemoveOptions{DryRun: false, Force: true},
+			expectedRemovals:  3,
 			expectedBlockedBy: 3,
-			expectedBlocking: 0,
-			expectError:      false,
+			expectedBlocking:  0,
+			expectError:       false,
 		},
 		{
 			name:  "remove all - only blocking relationships",
 			issue: CreateIssueRef("owner", "repo", 123),
 			mockDependencies: &DependencyData{
 				SourceIssue: Issue{Number: 123},
-				BlockedBy:  []DependencyRelation{},
+				BlockedBy:   []DependencyRelation{},
 				Blocking: []DependencyRelation{
 					{Issue: Issue{Number: 456}, Repository: "owner/repo"},
 					{Issue: Issue{Number: 789}, Repository: "owner/repo"},
 				},
 				TotalCount: 2,
 			},
-			opts:             RemoveOptions{DryRun: false, Force: true},
-			expectedRemovals: 2,
+			opts:              RemoveOptions{DryRun: false, Force: true},
+			expectedRemovals:  2,
 			expectedBlockedBy: 0,
-			expectedBlocking: 2,
-			expectError:      false,
+			expectedBlocking:  2,
+			expectError:       false,
 		},
 		{
 			name:  "remove all - no dependencies",
@@ -797,11 +797,11 @@ func TestRemoveAllRelationships(t *testing.T) {
 				},
 				TotalCount: 2,
 			},
-			opts:             RemoveOptions{DryRun: true, Force: false},
-			expectedRemovals: 0, // Dry run should not remove anything
+			opts:              RemoveOptions{DryRun: true, Force: false},
+			expectedRemovals:  0, // Dry run should not remove anything
 			expectedBlockedBy: 1,
-			expectedBlocking: 1,
-			expectError:      false,
+			expectedBlocking:  1,
+			expectError:       false,
 		},
 	}
 
@@ -813,7 +813,7 @@ func TestRemoveAllRelationships(t *testing.T) {
 
 			// Simulate dependency counting
 			totalDependencies := len(tt.mockDependencies.BlockedBy) + len(tt.mockDependencies.Blocking)
-			
+
 			if totalDependencies == 0 {
 				assert.True(t, tt.expectError, "Should error when no dependencies exist")
 				t.Log("No dependencies found - expected error condition")
@@ -844,13 +844,13 @@ func TestRemoveAllRelationships(t *testing.T) {
 // TestErrorHandlingScenarios tests comprehensive error handling
 func TestErrorHandlingScenarios(t *testing.T) {
 	errorScenarios := []struct {
-		name          string
-		source        IssueRef
-		target        IssueRef
-		relType       string
-		mockError     error
-		expectedType  ErrorType
-		shouldRetry   bool
+		name         string
+		source       IssueRef
+		target       IssueRef
+		relType      string
+		mockError    error
+		expectedType ErrorType
+		shouldRetry  bool
 	}{
 		{
 			name:         "authentication error",

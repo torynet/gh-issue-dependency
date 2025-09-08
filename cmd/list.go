@@ -67,7 +67,7 @@ FLAGS
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		issueNumber := args[0]
-		
+
 		// Resolve repository context using GitHub repository detection.
 		// This handles both explicit --repo flags and automatic detection
 		// from the current working directory's git remote.
@@ -75,7 +75,7 @@ FLAGS
 		if err != nil {
 			return err
 		}
-		
+
 		// Parse and validate the issue number from the user input.
 		// This supports both simple numbers (123) and full references (owner/repo#123).
 		_, issueNum, err := pkg.ParseIssueReference(issueNumber)
@@ -151,19 +151,19 @@ var (
 	// listDetailed controls whether to show detailed dependency information
 	// including creation dates, users who created relationships, etc.
 	listDetailed bool
-	
+
 	// listFormat specifies the output format for dependency information.
 	// Supported formats: table (default), json, csv
 	listFormat string
-	
+
 	// listState filters dependencies by issue state.
 	// Supported states: all (default), open, closed
 	listState string
-	
+
 	// listSort specifies the sort order for dependencies.
 	// Supported orders: number (default), title, state, repository
 	listSort string
-	
+
 	// listJSON specifies JSON fields for selective output
 	// When set, overrides listFormat to use JSON with specific fields
 	listJSON string
@@ -175,28 +175,28 @@ func fetchAndDisplayDependencies(owner, repo string, issueNum int, format, state
 	// Create context with timeout for API calls
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	
+
 	// Clean expired cache entries periodically (fail silently if error)
 	go pkg.CleanExpiredCache()
-	
+
 	// Fetch dependency data from GitHub API
 	originalData, err := pkg.FetchIssueDependencies(ctx, owner, repo, issueNum)
 	if err != nil {
 		return err
 	}
-	
+
 	// Apply state filtering, keeping reference to original data
 	filteredData := applyStateFilter(originalData, state)
-	
+
 	// Apply sorting to the filtered data
 	filteredData = applySorting(filteredData, sortOrder)
-	
+
 	// Determine output format and create formatter
 	outputOptions := pkg.DefaultOutputOptions()
 	outputOptions.Detailed = detailed
 	outputOptions.StateFilter = state
 	outputOptions.OriginalData = originalData
-	
+
 	// Handle JSON field selection
 	if listJSON != "" {
 		outputOptions.Format = pkg.FormatJSON
@@ -217,7 +217,7 @@ func fetchAndDisplayDependencies(owner, repo string, issueNum int, format, state
 			outputOptions.Format = pkg.FormatAuto
 		}
 	}
-	
+
 	// Create formatter and display results
 	formatter := pkg.NewOutputFormatter(outputOptions)
 	return formatter.FormatOutput(filteredData)
@@ -228,7 +228,7 @@ func parseJSONFields(fieldsStr string) []string {
 	if fieldsStr == "" {
 		return []string{}
 	}
-	
+
 	// Split by comma and trim whitespace
 	var fields []string
 	for _, field := range strings.Split(fieldsStr, ",") {
@@ -245,7 +245,7 @@ func applyStateFilter(data *pkg.DependencyData, state string) *pkg.DependencyDat
 	if state == "all" {
 		return data
 	}
-	
+
 	// Create a copy to avoid modifying the original
 	filtered := &pkg.DependencyData{
 		SourceIssue: data.SourceIssue,
@@ -253,24 +253,24 @@ func applyStateFilter(data *pkg.DependencyData, state string) *pkg.DependencyDat
 		Blocking:    []pkg.DependencyRelation{},
 		FetchedAt:   data.FetchedAt,
 	}
-	
+
 	// Filter blocked_by relationships
 	for _, dep := range data.BlockedBy {
 		if state == "all" || dep.Issue.State == state {
 			filtered.BlockedBy = append(filtered.BlockedBy, dep)
 		}
 	}
-	
+
 	// Filter blocking relationships
 	for _, dep := range data.Blocking {
 		if state == "all" || dep.Issue.State == state {
 			filtered.Blocking = append(filtered.Blocking, dep)
 		}
 	}
-	
+
 	// Update total count
 	filtered.TotalCount = len(filtered.BlockedBy) + len(filtered.Blocking)
-	
+
 	return filtered
 }
 
@@ -280,7 +280,7 @@ func applySorting(data *pkg.DependencyData, sortOrder string) *pkg.DependencyDat
 		// Default is already sorted by number from API, no need to re-sort
 		return data
 	}
-	
+
 	// Create a copy to avoid modifying the original
 	sorted := &pkg.DependencyData{
 		SourceIssue:            data.SourceIssue,
@@ -291,17 +291,17 @@ func applySorting(data *pkg.DependencyData, sortOrder string) *pkg.DependencyDat
 		OriginalBlockedByCount: data.OriginalBlockedByCount,
 		OriginalBlockingCount:  data.OriginalBlockingCount,
 	}
-	
+
 	// Copy dependencies for sorting
 	copy(sorted.BlockedBy, data.BlockedBy)
 	copy(sorted.Blocking, data.Blocking)
-	
+
 	// Sort blocked_by relationships
 	sortDependencySlice(sorted.BlockedBy, sortOrder)
-	
+
 	// Sort blocking relationships
 	sortDependencySlice(sorted.Blocking, sortOrder)
-	
+
 	return sorted
 }
 

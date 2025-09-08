@@ -44,13 +44,13 @@ func (e *RemovalExecutor) ExecuteRemoval(sourceIssueStr, dependencyRefsStr, rela
 	// 3. Parse target dependencies
 	dependencyRefs := strings.Split(dependencyRefsStr, ",")
 	var targets []IssueRef
-	
+
 	for _, depRef := range dependencyRefs {
 		depRef = strings.TrimSpace(depRef)
 		if depRef == "" {
 			continue
 		}
-		
+
 		targetRef, err := ParseIssueRefWithRepo(depRef, owner, repo)
 		if err != nil {
 			return fmt.Errorf("invalid dependency reference '%s': %w", depRef, err)
@@ -113,13 +113,13 @@ func (e *RemovalExecutor) outputDryRunPreview(source IssueRef, targets []IssueRe
 		case "blocks":
 			arrow = "→" // Source blocks target
 		}
-		
+
 		fmt.Printf("  ❌ %s relationship: %s %s %s\n", relType, source.String(), arrow, target.String())
 	}
 
 	fmt.Println()
 	fmt.Println("No changes made. Use --force to skip confirmation or remove --dry-run to execute.")
-	
+
 	return nil
 }
 
@@ -127,7 +127,7 @@ func (e *RemovalExecutor) outputDryRunPreview(source IssueRef, targets []IssueRe
 func (e *RemovalExecutor) promptConfirmation(source IssueRef, targets []IssueRef, relType string) (bool, error) {
 	fmt.Println("Remove dependency relationship(s)?")
 	fmt.Printf("  Source: %s\n", source.String())
-	
+
 	if len(targets) == 1 {
 		fmt.Printf("  Target: %s\n", targets[0].String())
 	} else {
@@ -136,18 +136,18 @@ func (e *RemovalExecutor) promptConfirmation(source IssueRef, targets []IssueRef
 			fmt.Printf("    - %s\n", target.String())
 		}
 	}
-	
+
 	fmt.Printf("  Type: %s\n", relType)
 	fmt.Println()
-	
+
 	if len(targets) == 1 {
 		fmt.Printf("This will remove the \"%s\" relationship between these issues.\n", relType)
 	} else {
 		fmt.Printf("This will remove %d \"%s\" relationships.\n", len(targets), relType)
 	}
-	
+
 	fmt.Print("Continue? (y/N): ")
-	
+
 	// In a real implementation, this would read from stdin
 	// For now, we'll simulate confirmation
 	// TODO: Implement actual stdin reading for confirmation
@@ -162,7 +162,7 @@ func (e *RemovalExecutor) promptConfirmation(source IssueRef, targets []IssueRef
 func (e *RemovalExecutor) executeRemoval(source IssueRef, targets []IssueRef, relType string) error {
 	// TODO: Implement actual GitHub API calls for dependency removal
 	// This would use DELETE requests to remove the relationships
-	
+
 	return NewAppError(
 		ErrorTypeInternal,
 		"Dependency removal not implemented yet",
