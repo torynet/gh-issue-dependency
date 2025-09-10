@@ -1,7 +1,6 @@
 package pkg
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -164,51 +163,3 @@ func TestBasicValidationErrorScenarios(t *testing.T) {
 	})
 }
 
-// Example usage patterns for integration with cmd/remove.go
-func ExampleBasicRemovalValidator_ValidateRemoval() {
-	// This example shows how to use the validator in the remove command
-
-	// 1. Create validator
-	validator, err := NewRemovalValidator()
-	if err != nil {
-		fmt.Printf("Failed to create validator: %v\n", err)
-		return
-	}
-
-	// 2. Parse issue references
-	source := CreateIssueRef("owner", "repo", 123)
-	target := CreateIssueRef("owner", "repo", 456)
-
-	// 3. Validate removal
-	err = validator.ValidateRemoval(source, target, "blocked-by")
-	if err != nil {
-		fmt.Printf("Validation failed: %v\n", err)
-		return
-	}
-
-	fmt.Println("Validation successful - ready to remove relationship")
-}
-
-// Example batch validation
-func ExampleBasicRemovalValidator_ValidateBatchRemoval() {
-	validator, err := NewRemovalValidator()
-	if err != nil {
-		fmt.Printf("Failed to create validator: %v\n", err)
-		return
-	}
-
-	source := CreateIssueRef("owner", "repo", 123)
-	targets := []IssueRef{
-		CreateIssueRef("owner", "repo", 456),
-		CreateIssueRef("owner", "repo", 789),
-		CreateIssueRef("other", "repo", 101),
-	}
-
-	err = validator.ValidateBatchRemoval(source, targets, "blocks")
-	if err != nil {
-		fmt.Printf("Batch validation failed: %v\n", err)
-		return
-	}
-
-	fmt.Println("Batch validation successful")
-}

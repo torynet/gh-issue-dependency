@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+
 // Test data helpers
 func createTestDependencyData() *DependencyData {
 	return &DependencyData{
@@ -19,7 +20,7 @@ func createTestDependencyData() *DependencyData {
 			Number:     123,
 			Title:      "Main Feature Implementation",
 			State:      "open",
-			Repository: "testowner/testrepo",
+			Repository: createRepositoryInfo("testowner/testrepo"),
 			HTMLURL:    "https://github.com/testowner/testrepo/issues/123",
 			Assignees: []User{
 				{Login: "alice", HTMLURL: "https://github.com/alice"},
@@ -34,7 +35,7 @@ func createTestDependencyData() *DependencyData {
 					Number:     45,
 					Title:      "Setup Database Schema",
 					State:      "open",
-					Repository: "testowner/testrepo",
+					Repository: createRepositoryInfo("testowner/testrepo"),
 					HTMLURL:    "https://github.com/testowner/testrepo/issues/45",
 					Assignees: []User{
 						{Login: "bob", HTMLURL: "https://github.com/bob"},
@@ -48,7 +49,7 @@ func createTestDependencyData() *DependencyData {
 					Number:     67,
 					Title:      "API Endpoint Creation",
 					State:      "closed",
-					Repository: "testowner/testrepo",
+					Repository: createRepositoryInfo("testowner/testrepo"),
 					HTMLURL:    "https://github.com/testowner/testrepo/issues/67",
 				},
 				Type:       "blocked_by",
@@ -61,7 +62,7 @@ func createTestDependencyData() *DependencyData {
 					Number:     89,
 					Title:      "Frontend Integration",
 					State:      "open",
-					Repository: "testowner/frontend",
+					Repository: createRepositoryInfo("testowner/frontend"),
 					HTMLURL:    "https://github.com/testowner/frontend/issues/89",
 					Assignees: []User{
 						{Login: "charlie", HTMLURL: "https://github.com/charlie"},
@@ -87,7 +88,7 @@ func createEmptyDependencyData() *DependencyData {
 			Number:     456,
 			Title:      "Standalone Task",
 			State:      "open",
-			Repository: "testowner/testrepo",
+			Repository: createRepositoryInfo("testowner/testrepo"),
 			HTMLURL:    "https://github.com/testowner/testrepo/issues/456",
 		},
 		BlockedBy:  []DependencyRelation{},
@@ -446,7 +447,7 @@ func TestFormatCSVOutput(t *testing.T) {
 					Number:     1,
 					Title:      "Issue with \"quotes\" and, commas",
 					State:      "open",
-					Repository: "test/repo",
+					Repository: createRepositoryInfo("test/repo"),
 				},
 				BlockedBy:  []DependencyRelation{},
 				Blocking:   []DependencyRelation{},
@@ -693,7 +694,7 @@ func TestLargeDatasetOutput(t *testing.T) {
 			Number:     1000,
 			Title:      "Large Feature",
 			State:      "open",
-			Repository: "test/repo",
+			Repository: createRepositoryInfo("test/repo"),
 		},
 		FetchedAt: time.Now(),
 	}
@@ -705,7 +706,7 @@ func TestLargeDatasetOutput(t *testing.T) {
 				Number:     i,
 				Title:      fmt.Sprintf("Dependency %d", i),
 				State:      "open",
-				Repository: "test/repo",
+				Repository: createRepositoryInfo("test/repo"),
 			},
 			Type:       "blocked_by",
 			Repository: "test/repo",

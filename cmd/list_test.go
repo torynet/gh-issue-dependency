@@ -40,7 +40,7 @@ func createTestDependencyData() *pkg.DependencyData {
 					},
 				},
 				Type:       "blocked_by",
-				Repository: pkg.RepositoryInfo{FullName: "testowner/testrepo"},
+				Repository: "testowner/testrepo",
 			},
 			{
 				Issue: pkg.Issue{
@@ -51,7 +51,7 @@ func createTestDependencyData() *pkg.DependencyData {
 					HTMLURL:    "https://github.com/testowner/testrepo/issues/67",
 				},
 				Type:       "blocked_by",
-				Repository: pkg.RepositoryInfo{FullName: "testowner/testrepo"},
+				Repository: "testowner/testrepo",
 			},
 		},
 		Blocking: []pkg.DependencyRelation{
@@ -72,7 +72,7 @@ func createTestDependencyData() *pkg.DependencyData {
 					},
 				},
 				Type:       "blocks",
-				Repository: pkg.RepositoryInfo{FullName: "testowner/frontend"},
+				Repository: "testowner/frontend",
 			},
 		},
 		FetchedAt:  time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
@@ -186,13 +186,13 @@ func TestApplySorting(t *testing.T) {
 	originalData := &pkg.DependencyData{
 		SourceIssue: pkg.Issue{Number: 100, Title: "Source", State: "open"},
 		BlockedBy: []pkg.DependencyRelation{
-			{Issue: pkg.Issue{Number: 3, Title: "Zebra Issue", State: "closed", Repository: "zebra/repo"}, Repository: pkg.RepositoryInfo{FullName: "zebra/repo"}, Type: "blocked_by"},
-			{Issue: pkg.Issue{Number: 1, Title: "Alpha Issue", State: "open", Repository: "alpha/repo"}, Repository: pkg.RepositoryInfo{FullName: "alpha/repo"}, Type: "blocked_by"},
-			{Issue: pkg.Issue{Number: 2, Title: "Beta Issue", State: "open", Repository: "beta/repo"}, Repository: pkg.RepositoryInfo{FullName: "beta/repo"}, Type: "blocked_by"},
+			{Issue: pkg.Issue{Number: 3, Title: "Zebra Issue", State: "closed", Repository: pkg.RepositoryInfo{FullName: "zebra/repo"}}, Repository: "zebra/repo", Type: "blocked_by"},
+			{Issue: pkg.Issue{Number: 1, Title: "Alpha Issue", State: "open", Repository: pkg.RepositoryInfo{FullName: "alpha/repo"}}, Repository: "alpha/repo", Type: "blocked_by"},
+			{Issue: pkg.Issue{Number: 2, Title: "Beta Issue", State: "open", Repository: pkg.RepositoryInfo{FullName: "beta/repo"}}, Repository: "beta/repo", Type: "blocked_by"},
 		},
 		Blocking: []pkg.DependencyRelation{
-			{Issue: pkg.Issue{Number: 30, Title: "Gamma Issue", State: "closed", Repository: "gamma/repo"}, Repository: pkg.RepositoryInfo{FullName: "gamma/repo"}, Type: "blocks"},
-			{Issue: pkg.Issue{Number: 10, Title: "Delta Issue", State: "open", Repository: "delta/repo"}, Repository: pkg.RepositoryInfo{FullName: "delta/repo"}, Type: "blocks"},
+			{Issue: pkg.Issue{Number: 30, Title: "Gamma Issue", State: "closed", Repository: pkg.RepositoryInfo{FullName: "gamma/repo"}}, Repository: "gamma/repo", Type: "blocks"},
+			{Issue: pkg.Issue{Number: 10, Title: "Delta Issue", State: "open", Repository: pkg.RepositoryInfo{FullName: "delta/repo"}}, Repository: "delta/repo", Type: "blocks"},
 		},
 		FetchedAt:  time.Now(),
 		TotalCount: 5,
@@ -263,9 +263,9 @@ func TestApplySorting(t *testing.T) {
 
 func TestSortDependencySlice(t *testing.T) {
 	deps := []pkg.DependencyRelation{
-		{Issue: pkg.Issue{Number: 3, Title: "Charlie", State: "closed", Repository: "zebra/repo"}, Repository: "zebra/repo"},
-		{Issue: pkg.Issue{Number: 1, Title: "Alice", State: "open", Repository: "alpha/repo"}, Repository: "alpha/repo"},
-		{Issue: pkg.Issue{Number: 2, Title: "Bob", State: "open", Repository: "beta/repo"}, Repository: "beta/repo"},
+		{Issue: pkg.Issue{Number: 3, Title: "Charlie", State: "closed", Repository: pkg.RepositoryInfo{FullName: "zebra/repo"}}, Repository: "zebra/repo"},
+		{Issue: pkg.Issue{Number: 1, Title: "Alice", State: "open", Repository: pkg.RepositoryInfo{FullName: "alpha/repo"}}, Repository: "alpha/repo"},
+		{Issue: pkg.Issue{Number: 2, Title: "Bob", State: "open", Repository: pkg.RepositoryInfo{FullName: "beta/repo"}}, Repository: "beta/repo"},
 	}
 
 	t.Run("sort by title", func(t *testing.T) {

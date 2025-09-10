@@ -1,7 +1,6 @@
 package pkg
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -414,10 +413,8 @@ func TestDeleteRelationshipRetryLogic(t *testing.T) {
 				// In real implementation: time.Sleep(delay)
 			}
 
-			actualRetries := attempts - 1 // First attempt is not a retry
-			if finalError == nil {
-				actualRetries = attempts - 1
-			}
+			// actualRetries would be attempts - 1 in a real test environment
+			// Currently not used due to mock testing approach
 
 			// Verify retry behavior
 			if tt.expectedFinalError {

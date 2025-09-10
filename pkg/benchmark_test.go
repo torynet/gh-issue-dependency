@@ -8,6 +8,24 @@ import (
 	"time"
 )
 
+// Helper function to create RepositoryInfo from full name string
+func createRepositoryInfo(fullName string) RepositoryInfo {
+	parts := strings.SplitN(fullName, "/", 2)
+	if len(parts) != 2 {
+		return RepositoryInfo{FullName: fullName}
+	}
+	return RepositoryInfo{
+		Name:     parts[1],
+		FullName: fullName,
+		HTMLURL:  "https://github.com/" + fullName,
+		Owner: struct {
+			Login string `json:"login"`
+		}{
+			Login: parts[0],
+		},
+	}
+}
+
 // Benchmark tests for performance validation as required by issue #14
 // Target: < 2 seconds execution time for command
 
@@ -81,7 +99,7 @@ func createBenchmarkData(dependencyCount int) *DependencyData {
 				Number:     i,
 				Title:      fmt.Sprintf("Blocking dependency #%d with descriptive title that explains the work needed", i),
 				State:      []string{"open", "closed"}[i%2],
-				Repository: fmt.Sprintf("dependency/repo-%d", i%10),
+				Repository: createRepositoryInfo(fmt.Sprintf("dependency/repo-%d", i%10)),
 				HTMLURL:    fmt.Sprintf("https://github.com/dependency/repo-%d/issues/%d", i%10, i),
 				Assignees: []User{
 					{Login: fmt.Sprintf("assignee-%d", i%20), HTMLURL: fmt.Sprintf("https://github.com/assignee-%d", i%20)},
@@ -104,7 +122,7 @@ func createBenchmarkData(dependencyCount int) *DependencyData {
 				Number:     i + 1000,
 				Title:      fmt.Sprintf("Blocked issue #%d waiting for this feature to be completed", i),
 				State:      []string{"open", "closed"}[i%2],
-				Repository: fmt.Sprintf("blocked/repo-%d", i%8),
+				Repository: createRepositoryInfo(fmt.Sprintf("blocked/repo-%d", i%8)),
 				HTMLURL:    fmt.Sprintf("https://github.com/blocked/repo-%d/issues/%d", i%8, i+1000),
 				Assignees: []User{
 					{Login: fmt.Sprintf("blocked-assignee-%d", i%15), HTMLURL: fmt.Sprintf("https://github.com/blocked-assignee-%d", i%15)},
@@ -402,7 +420,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 					Number:     i,
 					Title:      fmt.Sprintf("Issue %d", i),
 					State:      "open",
-					Repository: "test/repo",
+					Repository: createRepositoryInfo("test/repo"),
 					Assignees:  []User{{Login: fmt.Sprintf("user%d", i)}},
 					Labels:     []Label{{Name: fmt.Sprintf("label%d", i)}},
 				},
@@ -429,7 +447,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 						Number:     j,
 						Title:      fmt.Sprintf("Dependency %d", j),
 						State:      "open",
-						Repository: "test/repo",
+						Repository: createRepositoryInfo("test/repo"),
 					},
 					Type:       "blocked_by",
 					Repository: "test/repo",

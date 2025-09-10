@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+
 // Test various error conditions and edge cases
 func TestErrorHandlingEdgeCases(t *testing.T) {
 	t.Run("ParseRepoFlag edge cases", func(t *testing.T) {
@@ -168,7 +169,7 @@ func TestDataStructureEdgeCases(t *testing.T) {
 			Assignees:  []User{},  // Empty slice
 			Labels:     []Label{}, // Empty slice
 			HTMLURL:    "",        // Empty URL
-			Repository: "",        // Empty repository
+			Repository: RepositoryInfo{},        // Empty repository
 		}
 
 		// Should not panic with empty fields
@@ -212,7 +213,7 @@ func TestOutputFormattingEdgeCases(t *testing.T) {
 				Number:     123,
 				Title:      longTitle,
 				State:      "open",
-				Repository: "test/repo",
+				Repository: createRepositoryInfo("test/repo"),
 			},
 			BlockedBy:  []DependencyRelation{},
 			Blocking:   []DependencyRelation{},
@@ -240,7 +241,7 @@ func TestOutputFormattingEdgeCases(t *testing.T) {
 				Number:     123,
 				Title:      "Issue with \"quotes\" and \n newlines \t tabs",
 				State:      "open",
-				Repository: "test/repo",
+				Repository: createRepositoryInfo("test/repo"),
 			},
 			BlockedBy:  []DependencyRelation{},
 			Blocking:   []DependencyRelation{},
@@ -275,7 +276,7 @@ func TestOutputFormattingEdgeCases(t *testing.T) {
 				Number:     123,
 				Title:      "Issue, with \"commas\" and\nnewlines",
 				State:      "open",
-				Repository: "test/repo",
+				Repository: createRepositoryInfo("test/repo"),
 				Assignees: []User{
 					{Login: "user,with,commas"},
 				},
@@ -470,7 +471,7 @@ func TestMemoryAndPerformanceEdgeCases(t *testing.T) {
 					Number:     i,
 					Title:      fmt.Sprintf("Issue %d with some descriptive text", i),
 					State:      []string{"open", "closed"}[i%2], // Alternate states
-					Repository: fmt.Sprintf("repo%d/project%d", i%10, i%5),
+					Repository: createRepositoryInfo(fmt.Sprintf("repo%d/project%d", i%10, i%5)),
 					Assignees: []User{
 						{Login: fmt.Sprintf("user%d", i%50)},
 					},
@@ -517,7 +518,7 @@ func TestMemoryAndPerformanceEdgeCases(t *testing.T) {
 				Number:     123,
 				Title:      "Deep Repository Test",
 				State:      "open",
-				Repository: deepRepo,
+				Repository: createRepositoryInfo(deepRepo),
 			},
 			FetchedAt:  time.Now(),
 			TotalCount: 0,

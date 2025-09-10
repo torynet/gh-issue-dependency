@@ -1,8 +1,6 @@
 package pkg
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"strings"
 	"testing"

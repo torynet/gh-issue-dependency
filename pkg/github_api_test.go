@@ -1,8 +1,6 @@
 package pkg
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -451,7 +449,7 @@ func TestBatchDependencyRemoval(t *testing.T) {
 
 		// Mock successful responses for each deletion
 		mockClient := &MockHTTPClient{}
-		for _, target := range targets {
+		for i := 0; i < len(targets); i++ {
 			mockClient.AddResponse(204, "")
 		}
 
@@ -488,7 +486,7 @@ func TestBatchDependencyRemoval(t *testing.T) {
 		mockClient.AddResponse(404, `{"message": "Dependency not found"}`) // Failure
 		mockClient.AddResponse(204, "")                                    // Success
 
-		t.Logf("Testing partial batch failure scenario")
+		t.Logf("Testing partial batch failure scenario for %s", source.String())
 
 		expectedResults := []struct {
 			target     IssueRef
