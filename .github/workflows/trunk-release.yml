@@ -1,10 +1,11 @@
 name: Trunk-Based Release Pipeline
 
 on:
-  push:
-    branches: 
-      - main
-      - 'hotfix/**'
+  # Temporarily disabled to stop auto-creating tags while debugging
+  # push:
+  #   branches: 
+  #     - main
+  #     - 'hotfix/**'
   workflow_dispatch:
     inputs:
       promote_rc_to_release:
