@@ -316,7 +316,7 @@ jobs:
           sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
 
       - name: Upload RC artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rc-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
@@ -380,7 +380,7 @@ jobs:
           sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
 
       - name: Upload Hotfix RC artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: hotfix-rc-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
@@ -397,7 +397,7 @@ jobs:
     needs: [create-rc, build-rc, create-hotfix-rc, build-hotfix-rc]
     runs-on: ubuntu-latest
     environment: 
-      name: release
+      name: rc-approval
       url: https://github.com/${{ github.repository }}/releases
     
     steps:
