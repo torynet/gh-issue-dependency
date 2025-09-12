@@ -35,24 +35,32 @@ jobs:
       - name: Analyze conventional commit
         id: conventional
         run: |
-          COMMIT_MSG="$(git log -1 --pretty=%B)"
-          echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          # Get commit subject (first line only) for conventional commit analysis
+          COMMIT_SUBJECT="$(git log -1 --pretty=%s)"
+          COMMIT_BODY="$(git log -1 --pretty=%B)"
           
-          # Check if this is a conventional commit that should trigger release
-          if [[ "$COMMIT_MSG" =~ ^(feat|fix|perf)(\(.+\))?!?: .+ ]] || [[ "$COMMIT_MSG" =~ BREAKING.CHANGE ]]; then
+          echo "commit_subject=$COMMIT_SUBJECT" >> $GITHUB_OUTPUT
+          
+          # Use heredoc for multiline commit message
+          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Check if this is a conventional commit that should trigger release (using subject only)
+          if [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|perf)(\(.+\))?!?: .+ ]] || [[ "$COMMIT_BODY" =~ BREAKING.CHANGE ]]; then
             echo "should_release=true" >> $GITHUB_OUTPUT
             
             # Determine version bump type
-            if [[ "$COMMIT_MSG" =~ ^(feat|fix|perf)(\(.+\))?!: ]] || [[ "$COMMIT_MSG" =~ BREAKING.CHANGE ]]; then
+            if [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|perf)(\(.+\))?!: ]] || [[ "$COMMIT_BODY" =~ BREAKING.CHANGE ]]; then
               echo "bump_type=major" >> $GITHUB_OUTPUT
-            elif [[ "$COMMIT_MSG" =~ ^feat(\(.+\))?: ]]; then
+            elif [[ "$COMMIT_SUBJECT" =~ ^feat(\(.+\))?: ]]; then
               echo "bump_type=minor" >> $GITHUB_OUTPUT  
             else
               echo "bump_type=patch" >> $GITHUB_OUTPUT
             fi
           else
             echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ Commit does not follow conventional commit format for releases: $COMMIT_MSG"
+            echo "ℹ️ Commit does not follow conventional commit format for releases: $COMMIT_SUBJECT"
           fi
 
       - name: Calculate next version
