@@ -1,0 +1,218 @@
+name: Auto-Squash Conventional Commits
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+  pull_request_target:
+    types: [opened, edited, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  generate-conventional-commit:
+    name: Generate Conventional Commit Message
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.state == 'open'
+    
+    steps:
+      - name: Extract PR Information
+        id: pr_info
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          
+          echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          
+          # Extract issue number from branch name
+          if [[ "$BRANCH_NAME" =~ ^(feature|hotfix|epic)/([0-9]+)- ]]; then
+            ISSUE_NUM="${BASH_REMATCH[2]}"
+            echo "issue_number=$ISSUE_NUM" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Analyze PR for Conventional Commit Type
+        id: commit_type
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+          
+          # Initialize variables
+          COMMIT_TYPE=""
+          IS_BREAKING="false"
+          BREAKING_CHANGE_DESC=""
+          
+          # Parse PR body for change type checkboxes
+          if echo "$PR_BODY" | grep -q "- \[x\] 🐛 Bug fix"; then
+            COMMIT_TYPE="fix"
+          elif echo "$PR_BODY" | grep -q "- \[x\] ✨ New feature"; then
+            COMMIT_TYPE="feat"
+          elif echo "$PR_BODY" | grep -q "- \[x\] ⚡ Performance improvement"; then
+            COMMIT_TYPE="perf"
+          elif echo "$PR_BODY" | grep -q "- \[x\] 🔄 Refactoring"; then
+            COMMIT_TYPE="refactor"
+          elif echo "$PR_BODY" | grep -q "- \[x\] 📚 Documentation update"; then
+            COMMIT_TYPE="docs"
+          elif echo "$PR_BODY" | grep -q "- \[x\] 🧪 Test improvements"; then
+            COMMIT_TYPE="test"
+          elif echo "$PR_BODY" | grep -q "- \[x\] 🔧 Build/CI changes"; then
+            COMMIT_TYPE="ci"
+          fi
+          
+          # Check for breaking changes
+          if echo "$PR_BODY" | grep -q "- \[x\] ⚠️.*breaking changes"; then
+            IS_BREAKING="true"
+            
+            # Extract breaking change description
+            BREAKING_DESC=$(echo "$PR_BODY" | sed -n '/### Breaking Change Description:/,/###\|---/p' | head -n -1 | tail -n +2 | sed '/^$/d' | sed 's/^<!-- .* -->$//' | grep -v "^$")
+            
+            if [ ! -z "$BREAKING_DESC" ]; then
+              BREAKING_CHANGE_DESC="$BREAKING_DESC"
+            fi
+          fi
+          
+          echo "commit_type=$COMMIT_TYPE" >> $GITHUB_OUTPUT
+          echo "is_breaking=$IS_BREAKING" >> $GITHUB_OUTPUT
+          echo "breaking_change_desc<<EOF" >> $GITHUB_OUTPUT
+          echo "$BREAKING_CHANGE_DESC" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate Conventional Commit Message
+        id: conventional_commit
+        run: |
+          COMMIT_TYPE="${{ steps.commit_type.outputs.commit_type }}"
+          IS_BREAKING="${{ steps.commit_type.outputs.is_breaking }}"
+          PR_TITLE="${{ steps.pr_info.outputs.pr_title }}"
+          ISSUE_NUM="${{ steps.pr_info.outputs.issue_number }}"
+          BREAKING_DESC="${{ steps.commit_type.outputs.breaking_change_desc }}"
+          
+          # Remove issue number from PR title if present
+          CLEAN_TITLE=$(echo "$PR_TITLE" | sed "s/^${ISSUE_NUM}: //")
+          
+          # Build conventional commit message
+          if [ "$IS_BREAKING" = "true" ]; then
+            CONVENTIONAL_MSG="${COMMIT_TYPE}!: ${CLEAN_TITLE}"
+          else
+            CONVENTIONAL_MSG="${COMMIT_TYPE}: ${CLEAN_TITLE}"
+          fi
+          
+          # Add breaking change footer if needed
+          if [ "$IS_BREAKING" = "true" ] && [ ! -z "$BREAKING_DESC" ]; then
+            CONVENTIONAL_MSG="${CONVENTIONAL_MSG}
+
+BREAKING CHANGE: ${BREAKING_DESC}"
+          fi
+          
+          echo "conventional_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$CONVENTIONAL_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "commit_type_found=$COMMIT_TYPE" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR with Squash Preview  
+        if: steps.conventional_commit.outputs.commit_type_found != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const conventionalMessage = `${{ steps.conventional_commit.outputs.conventional_message }}`;
+            const commitType = `${{ steps.conventional_commit.outputs.commit_type_found }}`;
+            const isBreaking = `${{ steps.commit_type.outputs.is_breaking }}` === 'true';
+            
+            // Determine version impact
+            let versionImpact = '';
+            if (isBreaking) {
+              versionImpact = '🔴 **Major version bump** (breaking change)';
+            } else if (commitType === 'feat') {
+              versionImpact = '🟡 **Minor version bump** (new feature)';
+            } else if (commitType === 'fix' || commitType === 'perf') {
+              versionImpact = '🟢 **Patch version bump** (bug fix/performance)';
+            } else {
+              versionImpact = '⚫ **No version bump** (internal change)';
+            }
+            
+            const comment = `## 🤖 Conventional Commit Preview
+            
+When this PR is squash merged, it will create the following conventional commit:
+
+\`\`\`
+${conventionalMessage}
+\`\`\`
+
+**Version Impact:** ${versionImpact}
+
+This will ${commitType === 'feat' || commitType === 'fix' || commitType === 'perf' || isBreaking ? 'trigger an RC build' : 'not trigger a release'} after merge to main.
+
+---
+*This comment is automatically generated based on the PR template selections.*`;
+
+            // Check if we already commented
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('🤖 Conventional Commit Preview')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
+      - name: Validation Warning
+        if: steps.conventional_commit.outputs.commit_type_found == ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = `## ⚠️ PR Template Not Completed
+            
+Please complete the PR template by checking the appropriate boxes for:
+- Type of Change (🐛 Bug fix, ✨ New feature, etc.)
+- Breaking Changes (if applicable)
+
+This ensures the squash merge creates a proper conventional commit message for automated versioning.
+
+---
+*Complete the template and I'll show you the conventional commit preview.*`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              (comment.body.includes('🤖 Conventional Commit Preview') || comment.body.includes('⚠️ PR Template Not Completed'))
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
