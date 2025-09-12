@@ -46,20 +46,29 @@ jobs:
           echo "$COMMIT_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
-          # Check if this is a conventional commit that should trigger release (using subject only)
-          if [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|perf)(\(.+\))?!?: .+ ]] || [[ "$COMMIT_BODY" =~ BREAKING.CHANGE ]]; then
-            echo "should_release=true" >> $GITHUB_OUTPUT
-            
-            # Determine version bump type
-            if [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|perf)(\(.+\))?!: ]] || [[ "$COMMIT_BODY" =~ BREAKING.CHANGE ]]; then
-              echo "bump_type=major" >> $GITHUB_OUTPUT
-            elif [[ "$COMMIT_SUBJECT" =~ ^feat(\(.+\))?: ]]; then
-              echo "bump_type=minor" >> $GITHUB_OUTPUT  
-            else
-              echo "bump_type=patch" >> $GITHUB_OUTPUT
-            fi
+          # Check if this is a conventional commit that should trigger release
+          SHOULD_RELEASE="false"
+          BUMP_TYPE=""
+          
+          # Check for breaking changes
+          if [[ "$COMMIT_SUBJECT" =~ ^feat! ]] || [[ "$COMMIT_SUBJECT" =~ ^fix! ]] || [[ "$COMMIT_SUBJECT" =~ ^perf! ]] || [[ "$COMMIT_BODY" == *"BREAKING CHANGE"* ]]; then
+            SHOULD_RELEASE="true"
+            BUMP_TYPE="major"
+          # Check for new features
+          elif [[ "$COMMIT_SUBJECT" =~ ^feat: ]] || [[ "$COMMIT_SUBJECT" =~ ^feat\( ]]; then
+            SHOULD_RELEASE="true"
+            BUMP_TYPE="minor"
+          # Check for fixes and performance improvements
+          elif [[ "$COMMIT_SUBJECT" =~ ^fix: ]] || [[ "$COMMIT_SUBJECT" =~ ^fix\( ]] || [[ "$COMMIT_SUBJECT" =~ ^perf: ]] || [[ "$COMMIT_SUBJECT" =~ ^perf\( ]]; then
+            SHOULD_RELEASE="true"
+            BUMP_TYPE="patch"
+          fi
+          
+          echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+          if [ "$SHOULD_RELEASE" = "true" ]; then
+            echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+            echo "✅ Conventional commit detected: $COMMIT_SUBJECT (bump: $BUMP_TYPE)"
           else
-            echo "should_release=false" >> $GITHUB_OUTPUT
             echo "ℹ️ Commit does not follow conventional commit format for releases: $COMMIT_SUBJECT"
           fi
 
