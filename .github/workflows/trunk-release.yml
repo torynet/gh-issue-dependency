@@ -1,4 +1,4 @@
-name: Trunk-Based Release Pipeline
+name: RC
 
 on:
   push:
@@ -397,7 +397,7 @@ jobs:
     needs: [create-rc, build-rc, create-hotfix-rc, build-hotfix-rc]
     runs-on: ubuntu-latest
     environment: 
-      name: release-approval
+      name: release
       url: https://github.com/${{ github.repository }}/releases
     
     steps:
