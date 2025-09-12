@@ -18,7 +18,7 @@ var listCmd = &cobra.Command{
 
 DEPENDENCIES SHOWN
   • Blocking issues: Issues that must be resolved before this issue can be completed
-  • Blocked issues: Issues that are waiting for this issue to be completed  
+  • Blocked issues: Issues that are waiting for this issue to be completed
   • Cross-repository dependencies when applicable
 
 OUTPUT FORMATS
@@ -38,7 +38,7 @@ FLAGS
 	Example: `  # List all dependencies for issue #123
   gh issue-dependency list 123
 
-  # List dependencies for issue in a different repository  
+  # List dependencies for issue in a different repository
   gh issue-dependency list 456 --repo owner/other-repo
 
   # Show detailed dependency information

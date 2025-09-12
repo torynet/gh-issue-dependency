@@ -1,5 +1,174 @@
 {
-  "cSpell.words": [
-    "yahsan"
-  ]
+  "// Spell Check Configuration": "",
+  "cSpell.words": ["yahsan", "goimports", "golangci", "mkdocs", "torynet", "conv", "deps", "fmt", "pkg", "structs", "unmarshal", "workplans"],
+
+  "// Go Configuration": "",
+  "go.formatTool": "goimports",
+  "go.lintTool": "golangci-lint",
+  "go.lintOnSave": "package",
+  "go.buildOnSave": "package",
+  "go.vetOnSave": "package",
+  "go.coverOnSave": false,
+  "go.useLanguageServer": true,
+  "go.toolsManagement.autoUpdate": true,
+  "go.testFlags": ["-v", "-race"],
+  "go.testTimeout": "30s",
+  "go.buildTags": "",
+  "go.testTags": "",
+
+  "// Go Format on Save": "",
+  "[go]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+      "source.fixAll": "explicit"
+    },
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4
+  },
+
+  "// Go Module Support": "",
+  "[go.mod]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+
+  "[go.sum]": {
+    "editor.formatOnSave": false
+  },
+
+  "// Markdown Configuration": "",
+  "markdownlint.config": {
+    "MD013": false,
+    "MD033": false,
+    "MD041": false,
+    "MD024": false
+  },
+
+  "[markdown]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+    "editor.wordWrap": "on",
+    "editor.wordWrapColumn": 120,
+    "editor.quickSuggestions": {
+      "comments": "off",
+      "strings": "off",
+      "other": "off"
+    },
+    "editor.rulers": [80, 120]
+  },
+
+  "// YAML Configuration (GitHub Actions)": "",
+  "[yaml]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.detectIndentation": false
+  },
+
+  "[yml]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.detectIndentation": false
+  },
+
+  "// JSON Configuration": "",
+  "[json]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  },
+
+  "[jsonc]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  },
+
+  "// Shell Script Configuration": "",
+  "[shellscript]": {
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  },
+
+  "// General Editor Settings": "",
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "editor.formatOnType": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.rulers": [80, 120],
+  "editor.wordWrapColumn": 120,
+  "editor.renderWhitespace": "boundary",
+  "editor.trimAutoWhitespace": true,
+
+  "// File Association": "",
+  "files.associations": {
+    "*.md": "markdown",
+    "Dockerfile*": "dockerfile",
+    ".github/workflows/*.yml": "yaml",
+    ".github/workflows/*.yaml": "yaml",
+    "*.gotmpl": "go",
+    "*.gohtml": "html"
+  },
+
+  "// Line Endings (LF for cross-platform)": "",
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.trimFinalNewlines": true,
+
+  "// Git Configuration": "",
+  "git.enableCommitSigning": false,
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "git.suggestSmartCommit": false,
+
+  "// Terminal Configuration": "",
+  "terminal.integrated.defaultProfile.windows": "Git Bash",
+  "terminal.integrated.copyOnSelection": true,
+
+  "// Extension Specific Settings": "",
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.{yml,yaml}",
+    "https://json.schemastore.org/github-action.json": "action.{yml,yaml}",
+    "https://json.schemastore.org/dependabot-v2.json": ".github/dependabot.{yml,yaml}"
+  },
+
+  "// Problem Matcher": "",
+  "problems.showCurrentInStatus": true,
+  "problems.decorations.enabled": true,
+
+  "// Search Configuration": "",
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/*.code-search": true,
+    "**/vendor": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true
+  },
+
+  "// Auto Save": "",
+  "files.autoSave": "onFocusChange",
+  "files.autoSaveDelay": 1000,
+
+  "// Security": "",
+  "security.workspace.trust.untrustedFiles": "open",
+  "security.workspace.trust.enabled": false,
+
+  "// Telemetry": "",
+  "telemetry.telemetryLevel": "off"
 }

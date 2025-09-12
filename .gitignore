@@ -1,6 +1,5 @@
 # macOS
 .DS_Store
-.history
 
 # Go
 # Binaries for programs and plugins
@@ -29,7 +28,6 @@ go.work.sum
 .cache/
 
 # IDE and editor files
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -51,5 +49,6 @@ Thumbs.db
 .workplans/
 AGENTS.md
 COMMANDS.md
+.history
 
 # Other

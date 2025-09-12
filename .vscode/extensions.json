@@ -1,0 +1,38 @@
+{
+  "recommendations": [
+    // Go Development
+    "golang.go",
+
+    // Markdown Support and Linting
+    "DavidAnson.vscode-markdownlint",
+    "yzhang.markdown-all-in-one",
+    "bierner.markdown-preview-github-styles",
+
+    // YAML Support (GitHub Actions)
+    "redhat.vscode-yaml",
+
+    // JSON/Prettier Support
+    "esbenp.prettier-vscode",
+
+    // Git Integration
+    "eamodio.gitlens",
+    "GitHub.vscode-pull-request-github",
+
+    // Spell Checking
+    "streetsidesoftware.code-spell-checker",
+
+    // Shell Scripts
+    "timonwong.shellcheck",
+
+    // Editor Configuration
+    "editorconfig.editorconfig",
+
+    // Enhanced Language Support
+    "ruschaaf.extended-embedded-languages"
+  ],
+  "unwantedRecommendations": [
+    // Extensions that might conflict with Go development
+    "ms-python.python",
+    "ms-dotnettools.csharp"
+  ]
+}
