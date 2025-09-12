@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // Test data helpers
 func createTestDependencyData() *DependencyData {
 	return &DependencyData{

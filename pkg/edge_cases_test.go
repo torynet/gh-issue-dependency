@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // Test various error conditions and edge cases
 func TestErrorHandlingEdgeCases(t *testing.T) {
 	t.Run("ParseRepoFlag edge cases", func(t *testing.T) {
@@ -163,13 +162,13 @@ func TestDataStructureEdgeCases(t *testing.T) {
 
 	t.Run("Issue with empty fields", func(t *testing.T) {
 		issue := Issue{
-			Number:     0,         // Zero number
-			Title:      "",        // Empty title
-			State:      "",        // Empty state
-			Assignees:  []User{},  // Empty slice
-			Labels:     []Label{}, // Empty slice
-			HTMLURL:    "",        // Empty URL
-			Repository: RepositoryInfo{},        // Empty repository
+			Number:     0,                // Zero number
+			Title:      "",               // Empty title
+			State:      "",               // Empty state
+			Assignees:  []User{},         // Empty slice
+			Labels:     []Label{},        // Empty slice
+			HTMLURL:    "",               // Empty URL
+			Repository: RepositoryInfo{}, // Empty repository
 		}
 
 		// Should not panic with empty fields

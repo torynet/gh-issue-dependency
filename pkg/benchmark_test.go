@@ -279,7 +279,7 @@ func BenchmarkCacheOperations(b *testing.B) {
 			owner := owners[i%len(owners)]
 			repo := repos[i%len(repos)]
 			issue := issues[i%len(issues)]
-			
+
 			key := getCacheKey(owner, repo, issue)
 			if len(key) != 32 {
 				b.Fatalf("Invalid cache key length: %d", len(key))
@@ -296,7 +296,7 @@ func BenchmarkCacheOperations(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			key := keys[i%len(keys)]
-			
+
 			// Test cache miss (most common scenario)
 			data, found := getFromCache(key)
 			if found {
@@ -316,14 +316,14 @@ func BenchmarkDataProcessing(b *testing.B) {
 
 	b.Run("StateFiltering", func(b *testing.B) {
 		states := []string{"all", "open", "closed"}
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			state := states[i%len(states)]
-			
+
 			// This is the actual function from cmd/list.go
 			filtered := applyStateFilter(data, state)
-			
+
 			if filtered == nil {
 				b.Fatal("State filtering returned nil")
 			}
@@ -332,14 +332,14 @@ func BenchmarkDataProcessing(b *testing.B) {
 
 	b.Run("DataSorting", func(b *testing.B) {
 		sortOrders := []string{"number", "title", "state", "repository"}
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			sortOrder := sortOrders[i%len(sortOrders)]
-			
+
 			// This is the actual function from cmd/list.go
 			sorted := applySorting(data, sortOrder)
-			
+
 			if sorted == nil {
 				b.Fatal("Data sorting returned nil")
 			}
@@ -351,7 +351,7 @@ func BenchmarkDataProcessing(b *testing.B) {
 func BenchmarkStringOperations(b *testing.B) {
 	longString := strings.Repeat("Issue with very long title that needs special handling ", 10)
 	specialChars := "Issue with \"quotes\", commas, and\nnewlines\ttabs"
-	
+
 	b.Run("CSVEscaping", func(b *testing.B) {
 		testStrings := []string{
 			"simple string",
@@ -429,7 +429,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 				FetchedAt:  time.Now(),
 				TotalCount: 0,
 			}
-			
+
 			if data.SourceIssue.Number != i {
 				b.Fatal("Data creation failed")
 			}
@@ -440,7 +440,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var deps []DependencyRelation
-			
+
 			for j := 0; j < 50; j++ {
 				dep := DependencyRelation{
 					Issue: Issue{
@@ -454,7 +454,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 				}
 				deps = append(deps, dep)
 			}
-			
+
 			if len(deps) != 50 {
 				b.Fatal("Slice operations failed")
 			}
@@ -502,12 +502,12 @@ func BenchmarkConcurrentAccess(b *testing.B) {
 // Performance regression tests - these should complete within time bounds
 func TestPerformanceTargets(t *testing.T) {
 	// Target: < 2 seconds for typical operations as per issue requirements
-	
+
 	t.Run("formatting performance target", func(t *testing.T) {
 		data := createBenchmarkData(100) // Typical large dataset
-		
+
 		start := time.Now()
-		
+
 		var buffer bytes.Buffer
 		options := &OutputOptions{
 			Format:   FormatTTY,
@@ -517,18 +517,18 @@ func TestPerformanceTargets(t *testing.T) {
 
 		formatter := NewOutputFormatter(options)
 		err := formatter.FormatOutput(data)
-		
+
 		duration := time.Since(start)
-		
+
 		if err != nil {
 			t.Fatalf("Formatting failed: %v", err)
 		}
-		
+
 		// Should complete well under 2 seconds
 		if duration > 500*time.Millisecond {
 			t.Logf("Warning: Formatting took %v (target: < 500ms for 100 dependencies)", duration)
 		}
-		
+
 		// Hard limit - should never exceed 2 seconds
 		if duration > 2*time.Second {
 			t.Errorf("Formatting took %v, exceeds 2 second target", duration)
@@ -541,9 +541,9 @@ func TestPerformanceTargets(t *testing.T) {
 			"https://github.com/microsoft/vscode/issues/456",
 			"https://github.com/facebook/react/issues/789",
 		}
-		
+
 		start := time.Now()
-		
+
 		// Parse 1000 URLs to simulate heavy usage
 		for i := 0; i < 1000; i++ {
 			url := urls[i%len(urls)]
@@ -552,14 +552,14 @@ func TestPerformanceTargets(t *testing.T) {
 				t.Fatalf("URL parsing failed: %v", err)
 			}
 		}
-		
+
 		duration := time.Since(start)
-		
+
 		// Should complete very quickly
 		if duration > 100*time.Millisecond {
 			t.Logf("Warning: Parsing 1000 URLs took %v (target: < 100ms)", duration)
 		}
-		
+
 		if duration > 1*time.Second {
 			t.Errorf("Parsing took %v, exceeds reasonable target", duration)
 		}
@@ -572,26 +572,26 @@ func applyStateFilter(data *DependencyData, state string) *DependencyData {
 	if state == "all" {
 		return data
 	}
-	
+
 	filtered := &DependencyData{
 		SourceIssue: data.SourceIssue,
 		BlockedBy:   []DependencyRelation{},
 		Blocking:    []DependencyRelation{},
 		FetchedAt:   data.FetchedAt,
 	}
-	
+
 	for _, dep := range data.BlockedBy {
 		if dep.Issue.State == state {
 			filtered.BlockedBy = append(filtered.BlockedBy, dep)
 		}
 	}
-	
+
 	for _, dep := range data.Blocking {
 		if dep.Issue.State == state {
 			filtered.Blocking = append(filtered.Blocking, dep)
 		}
 	}
-	
+
 	filtered.TotalCount = len(filtered.BlockedBy) + len(filtered.Blocking)
 	return filtered
 }
@@ -600,7 +600,7 @@ func applySorting(data *DependencyData, sortOrder string) *DependencyData {
 	if sortOrder == "" || sortOrder == "number" {
 		return data
 	}
-	
+
 	sorted := &DependencyData{
 		SourceIssue: data.SourceIssue,
 		BlockedBy:   make([]DependencyRelation, len(data.BlockedBy)),
@@ -608,12 +608,12 @@ func applySorting(data *DependencyData, sortOrder string) *DependencyData {
 		FetchedAt:   data.FetchedAt,
 		TotalCount:  data.TotalCount,
 	}
-	
+
 	copy(sorted.BlockedBy, data.BlockedBy)
 	copy(sorted.Blocking, data.Blocking)
-	
+
 	// Simple sorting implementation for benchmarking
 	// In real code, this would use the actual sorting logic
-	
+
 	return sorted
 }
