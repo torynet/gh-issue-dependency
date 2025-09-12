@@ -21,6 +21,9 @@ jobs:
     environment: 
       name: beta
       url: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}
+    outputs:
+      rc_tag: ${{ steps.version.outputs.version }}
+      release_tag: ${{ steps.release_version.outputs.release_tag }}
     
     steps:
       - name: Checkout
@@ -51,6 +54,15 @@ jobs:
             exit 1
           fi
           echo "✅ Valid RC tag: $VERSION"
+
+      - name: Calculate release version
+        id: release_version
+        run: |
+          RC_TAG="${{ steps.version.outputs.version }}"
+          # Convert RC tag to release tag (v1.2.0-rc1 -> v1.2.0)
+          RELEASE_TAG=${RC_TAG%-rc*}
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "📋 RC: $RC_TAG → Release: $RELEASE_TAG"
 
       - name: Run tests
         run: go test -v -race ./...
@@ -114,7 +126,44 @@ jobs:
       - name: Notify beta deployment
         run: |
           echo "🧪 Beta deployment completed!"
-          echo "Version: ${{ steps.version.outputs.version }}"
+          echo "RC Version: ${{ steps.version.outputs.version }}"
+          echo "Target Release: ${{ steps.release_version.outputs.release_tag }}"
           echo "Download: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
           echo ""
-          echo "This beta release is now available for testing."
+          echo "🔬 Test this beta release thoroughly"
+          echo "✅ If ready for production, approve the next step to create release tag"
+
+  # Manual approval gate to promote RC to production release
+  promote-to-release:
+    name: Promote RC to Release
+    needs: beta-deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: beta-approval
+      url: https://github.com/${{ github.repository }}/releases/tag/${{ needs.beta-deploy.outputs.release_tag }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Create production release tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          RC_TAG="${{ needs.beta-deploy.outputs.rc_tag }}"
+          RELEASE_TAG="${{ needs.beta-deploy.outputs.release_tag }}"
+          
+          # Get the commit that the RC tag points to
+          RC_COMMIT=$(git rev-list -n 1 "$RC_TAG")
+          
+          echo "🏷️ Creating release tag: $RELEASE_TAG from RC: $RC_TAG"
+          echo "📍 Commit: $RC_COMMIT"
+          
+          git tag -a "$RELEASE_TAG" $RC_COMMIT -m "Release $RELEASE_TAG (promoted from $RC_TAG)"
+          git push origin "$RELEASE_TAG"
+          
+          echo "✅ Created production release tag: $RELEASE_TAG"
+          echo "🚀 Release workflow will now deploy this to production"

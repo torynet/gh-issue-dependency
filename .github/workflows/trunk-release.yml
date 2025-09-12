@@ -385,108 +385,30 @@ jobs:
           name: hotfix-rc-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
 
-  # Manual gate using GitHub Environment
-  promote-gate:
+  # Notify RC Creation
+  notify-rc-created:
+    name: Notify RC Created
+    needs: [create-rc, build-rc, create-hotfix-rc, build-hotfix-rc]
+    runs-on: ubuntu-latest
     if: |
       always() && (
         needs.create-rc.outputs.should_create_rc == 'true' || 
-        needs.create-hotfix-rc.outputs.should_create_hotfix_rc == 'true' || 
-        github.event_name == 'workflow_dispatch'
+        needs.create-hotfix-rc.outputs.should_create_hotfix_rc == 'true'
       )
-    name: Release Approval Gate
-    needs: [create-rc, build-rc, create-hotfix-rc, build-hotfix-rc]
-    runs-on: ubuntu-latest
-    environment: 
-      name: rc-approval
-      url: https://github.com/${{ github.repository }}/releases
     
     steps:
-      - name: Awaiting Release Approval
+      - name: RC Created Notification
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "🚀 Manual promotion requested for ${{ github.event.inputs.promote_rc_to_release }}"
-            echo "📋 Promoting RC to production release..."
-          elif [ "${{ needs.create-hotfix-rc.outputs.should_create_hotfix_rc }}" = "true" ]; then
-            echo "🩹 Hotfix RC ${{ needs.create-hotfix-rc.outputs.hotfix_rc_tag }} built successfully"
-            echo "📦 Base version: ${{ needs.create-hotfix-rc.outputs.base_version }}"
-            echo "🏗️ Hotfix binaries available for testing"
-            echo "⏳ Waiting for hotfix release approval..."
-            echo ""
-            echo "To test the hotfix RC build:"
-            echo "1. Download hotfix artifacts from this workflow run"
-            echo "2. Test the hotfix binaries against production scenarios"
-            echo "3. If ready, approve this deployment to create production hotfix release"
-          else
-            echo "📋 RC ${{ needs.create-rc.outputs.rc_tag }} built successfully"
-            echo "🏗️ Beta binaries available for testing"
-            echo "⏳ Waiting for release approval..."
-            echo ""
-            echo "To test the RC build:"
-            echo "1. Download artifacts from this workflow run"
-            echo "2. Test the beta binaries"
-            echo "3. If ready, approve this deployment to create production release"
-          fi
-
-  # Create release tag and build final release
-  create-release:
-    name: Create Release Build  
-    needs: [create-rc, create-hotfix-rc, promote-gate]
-    runs-on: ubuntu-latest
-    if: always() && needs.promote-gate.result == 'success'
-    outputs:
-      release_tag: ${{ steps.release.outputs.release_tag }}
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Determine release tag
-        id: release
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            RC_TAG="${{ github.event.inputs.promote_rc_to_release }}"
-          elif [ "${{ needs.create-hotfix-rc.outputs.should_create_hotfix_rc }}" = "true" ]; then
-            RC_TAG="${{ needs.create-hotfix-rc.outputs.hotfix_rc_tag }}"
-          else
-            RC_TAG="${{ needs.create-rc.outputs.rc_tag }}"
-          fi
-          
-          # Convert RC tag to release tag (v1.2.0-rc1 -> v1.2.0)
-          RELEASE_TAG=${RC_TAG%-rc*}
-          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-          echo "rc_tag=$RC_TAG" >> $GITHUB_OUTPUT
-          
           if [ "${{ needs.create-hotfix-rc.outputs.should_create_hotfix_rc }}" = "true" ]; then
-            echo "🩹 Creating hotfix release tag: $RELEASE_TAG (from RC: $RC_TAG)"
+            echo "🩹 Hotfix RC ${{ needs.create-hotfix-rc.outputs.hotfix_rc_tag }} created successfully"
+            echo "📦 Base version: ${{ needs.create-hotfix-rc.outputs.base_version }}"
+            echo "🚀 Beta workflow will automatically deploy this RC for testing"
           else
-            echo "🏷️ Creating release tag: $RELEASE_TAG (from RC: $RC_TAG)"
+            echo "🏷️ RC ${{ needs.create-rc.outputs.rc_tag }} created successfully"
+            echo "🚀 Beta workflow will automatically deploy this RC for testing"
           fi
-
-      - name: Create Release Tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Get the commit that the RC tag points to
-          RC_COMMIT=$(git rev-list -n 1 "${{ steps.release.outputs.rc_tag }}")
-          
-          git tag -a "${{ steps.release.outputs.release_tag }}" $RC_COMMIT -m "Release ${{ steps.release.outputs.release_tag }}"
-          git push origin "${{ steps.release.outputs.release_tag }}"
-          
-          echo "✅ Created release tag: ${{ steps.release.outputs.release_tag }}"
-
-  # This job will be triggered by the release tag created above
-  notify-success:
-    name: Notify Release Created
-    needs: [create-release]
-    runs-on: ubuntu-latest
-    if: always() && needs.create-release.result == 'success'
-    
-    steps:
-      - name: Success notification
-        run: |
-          echo "🎉 Release ${{ needs.create-release.outputs.release_tag }} has been created!"
-          echo "📦 Production build will be triggered automatically by the release tag"
-          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.create-release.outputs.release_tag }}"
+          echo ""
+          echo "Next steps:"
+          echo "1. RC will be deployed to beta environment automatically"
+          echo "2. Test the beta release thoroughly"
+          echo "3. If ready, approve the beta deployment to promote to production"
