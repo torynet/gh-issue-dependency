@@ -2,7 +2,9 @@ name: Trunk-Based Release Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: 
+      - main
+      - 'hotfix/**'
   workflow_dispatch:
     inputs:
       promote_rc_to_release:
@@ -15,7 +17,7 @@ permissions:
   packages: write
 
 jobs:
-  # Runs on main branch pushes (squash merges)
+  # Runs on main branch pushes (squash merges) 
   create-rc:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Create RC from Main Push
@@ -162,7 +164,100 @@ jobs:
           
           echo "🚀 Created RC tag: ${{ steps.version.outputs.rc_tag }}"
 
-  # Build RC (beta) version
+  # Runs on hotfix branch pushes
+  create-hotfix-rc:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/hotfix/')
+    name: Create Hotfix RC
+    runs-on: ubuntu-latest
+    outputs:
+      hotfix_rc_tag: ${{ steps.hotfix_version.outputs.rc_tag }}
+      should_create_hotfix_rc: ${{ steps.hotfix_version.outputs.should_release }}
+      hotfix_version: ${{ steps.hotfix_version.outputs.new_version }}
+      base_version: ${{ steps.hotfix_version.outputs.base_version }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate hotfix version
+        id: hotfix_version
+        run: |
+          # Extract branch name and validate hotfix pattern
+          BRANCH_NAME="${{ github.ref_name }}"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          
+          # Validate hotfix branch format: hotfix/{issue}-{description}
+          if [[ ! "$BRANCH_NAME" =~ ^hotfix/[0-9]+-.*$ ]]; then
+            echo "❌ Invalid hotfix branch format: $BRANCH_NAME"
+            echo "Expected: hotfix/{issue-number}-{description}"
+            echo "Example: hotfix/123-fix-auth-bug"
+            exit 1
+          fi
+          
+          # Find the base version this hotfix branch was created from
+          # Look for the most recent tag that this branch contains
+          BASE_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          
+          if [ -z "$BASE_TAG" ]; then
+            echo "❌ No base tag found. Hotfix branches must be created from existing release tags"
+            echo "Usage: git checkout v1.0.0 && git checkout -b hotfix/123-description"
+            exit 1
+          fi
+          
+          # Validate base tag is a release (not RC)
+          if [[ "$BASE_TAG" == *"-rc"* ]]; then
+            echo "❌ Hotfix base must be a release tag, not RC: $BASE_TAG"
+            echo "Checkout a production release tag (e.g. v1.0.0) before creating hotfix branch"
+            exit 1
+          fi
+          
+          echo "base_version=$BASE_TAG" >> $GITHUB_OUTPUT
+          
+          # Calculate next patch version
+          BASE_VERSION=${BASE_TAG#v}
+          IFS='.' read -r -a VERSION_PARTS <<< "$BASE_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]:-0}  
+          PATCH=${VERSION_PARTS[2]:-0}
+          
+          # Increment patch version
+          PATCH=$((PATCH + 1))
+          HOTFIX_VERSION="$MAJOR.$MINOR.$PATCH"
+          
+          # Find next RC number for this hotfix version
+          EXISTING_HOTFIX_RCS=$(git tag -l "v${HOTFIX_VERSION}-rc*" | sort -V)
+          if [ -z "$EXISTING_HOTFIX_RCS" ]; then
+            RC_NUMBER=1
+          else
+            HIGHEST_RC=$(echo "$EXISTING_HOTFIX_RCS" | tail -1)
+            RC_NUMBER=$(echo "$HIGHEST_RC" | sed 's/.*-rc//')
+            RC_NUMBER=$((RC_NUMBER + 1))
+          fi
+          
+          HOTFIX_RC_TAG="v${HOTFIX_VERSION}-rc${RC_NUMBER}"
+          
+          echo "new_version=$HOTFIX_VERSION" >> $GITHUB_OUTPUT
+          echo "rc_tag=$HOTFIX_RC_TAG" >> $GITHUB_OUTPUT
+          echo "rc_number=$RC_NUMBER" >> $GITHUB_OUTPUT
+          echo "should_release=true" >> $GITHUB_OUTPUT
+          
+          echo "🩹 Hotfix version: $HOTFIX_VERSION (from base $BASE_TAG)"
+          echo "🔢 Hotfix RC tag: $HOTFIX_RC_TAG"
+
+      - name: Create Hotfix RC Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag -a "${{ steps.hotfix_version.outputs.rc_tag }}" -m "Hotfix Release Candidate ${{ steps.hotfix_version.outputs.rc_tag }}"
+          git push origin "${{ steps.hotfix_version.outputs.rc_tag }}"
+          
+          echo "🚀 Created hotfix RC tag: ${{ steps.hotfix_version.outputs.rc_tag }}"
+
+  # Build RC (beta) version for main branch
   build-rc:
     if: needs.create-rc.outputs.should_create_rc == 'true'
     name: Build RC (Beta)
@@ -226,11 +321,80 @@ jobs:
           name: rc-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
 
+  # Build hotfix RC version  
+  build-hotfix-rc:
+    if: needs.create-hotfix-rc.outputs.should_create_hotfix_rc == 'true'
+    name: Build Hotfix RC
+    needs: create-hotfix-rc
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin  
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-1.21-${{ hashFiles('**/go.sum') }}
+
+      - name: Build Hotfix RC Binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            EXT=".exe"
+          fi
+          
+          BINARY_NAME="gh-issue-dependency-${{ needs.create-hotfix-rc.outputs.hotfix_rc_tag }}-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
+          
+          go build \
+            -ldflags "-s -w -X cmd.Version=${{ needs.create-hotfix-rc.outputs.hotfix_rc_tag }} -X cmd.Commit=${GITHUB_SHA:0:8} -X cmd.BuildType=hotfix" \
+            -o "dist/${BINARY_NAME}" \
+            .
+          
+          # Create checksums
+          cd dist
+          sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
+
+      - name: Upload Hotfix RC artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: hotfix-rc-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/
+
   # Manual gate using GitHub Environment
   promote-gate:
-    if: needs.create-rc.outputs.should_create_rc == 'true' || github.event_name == 'workflow_dispatch'
+    if: |
+      always() && (
+        needs.create-rc.outputs.should_create_rc == 'true' || 
+        needs.create-hotfix-rc.outputs.should_create_hotfix_rc == 'true' || 
+        github.event_name == 'workflow_dispatch'
+      )
     name: Release Approval Gate
-    needs: [create-rc, build-rc]
+    needs: [create-rc, build-rc, create-hotfix-rc, build-hotfix-rc]
     runs-on: ubuntu-latest
     environment: 
       name: release-approval
@@ -242,6 +406,16 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "🚀 Manual promotion requested for ${{ github.event.inputs.promote_rc_to_release }}"
             echo "📋 Promoting RC to production release..."
+          elif [ "${{ needs.create-hotfix-rc.outputs.should_create_hotfix_rc }}" = "true" ]; then
+            echo "🩹 Hotfix RC ${{ needs.create-hotfix-rc.outputs.hotfix_rc_tag }} built successfully"
+            echo "📦 Base version: ${{ needs.create-hotfix-rc.outputs.base_version }}"
+            echo "🏗️ Hotfix binaries available for testing"
+            echo "⏳ Waiting for hotfix release approval..."
+            echo ""
+            echo "To test the hotfix RC build:"
+            echo "1. Download hotfix artifacts from this workflow run"
+            echo "2. Test the hotfix binaries against production scenarios"
+            echo "3. If ready, approve this deployment to create production hotfix release"
           else
             echo "📋 RC ${{ needs.create-rc.outputs.rc_tag }} built successfully"
             echo "🏗️ Beta binaries available for testing"
@@ -256,7 +430,7 @@ jobs:
   # Create release tag and build final release
   create-release:
     name: Create Release Build  
-    needs: [create-rc, promote-gate]
+    needs: [create-rc, create-hotfix-rc, promote-gate]
     runs-on: ubuntu-latest
     if: always() && needs.promote-gate.result == 'success'
     outputs:
@@ -273,6 +447,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             RC_TAG="${{ github.event.inputs.promote_rc_to_release }}"
+          elif [ "${{ needs.create-hotfix-rc.outputs.should_create_hotfix_rc }}" = "true" ]; then
+            RC_TAG="${{ needs.create-hotfix-rc.outputs.hotfix_rc_tag }}"
           else
             RC_TAG="${{ needs.create-rc.outputs.rc_tag }}"
           fi
@@ -282,7 +458,11 @@ jobs:
           echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
           echo "rc_tag=$RC_TAG" >> $GITHUB_OUTPUT
           
-          echo "🏷️ Creating release tag: $RELEASE_TAG (from RC: $RC_TAG)"
+          if [ "${{ needs.create-hotfix-rc.outputs.should_create_hotfix_rc }}" = "true" ]; then
+            echo "🩹 Creating hotfix release tag: $RELEASE_TAG (from RC: $RC_TAG)"
+          else
+            echo "🏷️ Creating release tag: $RELEASE_TAG (from RC: $RC_TAG)"
+          fi
 
       - name: Create Release Tag
         run: |
