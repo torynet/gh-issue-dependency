@@ -1,49 +1,59 @@
-# Release Pipeline
+# Release Pipeline Documentation
 
 ## Overview
 
-This project uses a trunk-based development workflow with automated release management through conventional commits and manual approval gates.
+This project uses a **4-workflow architecture** with trunk-based development, automated RC creation, beta testing, manual promotion gates, and protected production deployments.
 
-## Workflow
+## Pipeline Architecture
 
-### Development Process
+### 4-Workflow System
 
-1. **Create Feature Branch**
+#### 1. **CI Workflow** (`ci.yml`)
+- **Triggers**: Feature/hotfix/epic branch pushes + PRs to main
+- **Purpose**: Code validation during development  
+- **No approval gates** - automated validation only
+
+#### 2. **RC Workflow** (`rc.yml`)
+- **Triggers**: Main branch pushes (squash merges)
+- **Purpose**: Automatic RC tag creation based on conventional commits
+- **No approval gates** - fully automated
+- **Outputs**: Creates RC tags like `v1.0.0-rc1`, `v1.0.0-rc2`
+
+#### 3. **Beta Workflow** (`beta.yml`)
+- **Triggers**: RC tags (`v*-rc*`)
+- **Two phases**:
+  1. **Beta Deploy**: Auto-deploy to `beta` environment → create pre-release
+  2. **Promotion Gate**: Manual approval in `beta-approval` environment → create production tag
+- **This is where RC→Release promotion happens**
+
+#### 4. **Release Workflow** (`release.yml`)
+- **Triggers**: Production tags (non-RC: `v*` but not `v*-rc*`)
+- **Purpose**: Production deployment with `release` environment protection
+- **Creates**: Final production releases with binaries
+
+### Complete Release Flow
+
+1. **Development**:
    ```bash
-   git checkout -b feature/123-add-new-feature
+   git checkout -b feature/123-new-feature
+   # CI validates on push, PR validation on merge
    ```
 
-2. **Make Commits** (automatic issue number injection)
-   ```bash
-   git commit -m "Add user authentication"
-   # Hook transforms to: "#123: Add user authentication"
+2. **RC Creation** (Automatic):
+   ```
+   Main push → RC workflow → Creates v1.0.0-rc1 → Notifies
    ```
 
-3. **Create Pull Request**
-   - Use PR template to indicate breaking changes
-   - Branch and PR title validation runs automatically
+3. **Beta Testing** (Automatic + Manual):
+   ```
+   RC tag → Beta workflow → Deploys to beta → Creates pre-release
+   → Manual approval → Creates v1.0.0 production tag
+   ```
 
-4. **Review and Merge**
-   - Squash merge to main with conventional commit format
-   - Example: `feat: add user authentication` or `feat!: add breaking API changes`
-
-### Release Process
-
-#### Automatic RC Creation
-- Push to `main` triggers conventional commit analysis
-- Version bump determined by commit type:
-  - `fix:` → patch (1.0.0 → 1.0.1)
-  - `feat:` → minor (1.0.0 → 1.1.0)  
-  - `feat!:` or `BREAKING CHANGE:` → major (1.0.0 → 2.0.0)
-- RC tag created: `v1.1.0-rc1`
-- Beta build artifacts generated
-
-#### Manual Release Gate
-- RC builds await approval in `release-approval` environment
-- Reviewers test beta artifacts
-- Manual approval promotes RC to production release
-- Release tag created: `v1.1.0`
-- Production build artifacts generated
+4. **Production Release** (Automatic with approval):
+   ```
+   Release tag → Release workflow → Requires approval → Production release
+   ```
 
 ## Branch Naming
 
@@ -132,17 +142,28 @@ feat!: remove deprecated API endpoints
 
 ## Environment Setup
 
-### Required GitHub Configuration
+### GitHub Environments
 
-1. **Environment: `release-approval`**
-   - Required reviewers: Release managers
-   - Deployment protection: `main` branch only
-   - Manual approval required
+1. **`beta`** Environment
+   - **Purpose**: RC tag testing and validation
+   - **Deployment tags**: `v[0-9]*.[0-9]*.[0-9]*-rc[0-9]*` (RC tags only)
+   - **Protection**: Optional - can be auto-deploy or minimal approval
 
-2. **Branch Protection: `main`**
-   - Require status checks: `validate-branch`, `validate-pr-title`, `test`, `lint`
-   - Require branches up to date
-   - No direct pushes (PR only)
+2. **`beta-approval`** Environment 
+   - **Purpose**: Manual gate for RC→Release promotion
+   - **Deployment branches**: `main` (where beta workflow runs)
+   - **Protection**: **Required reviewers** for production promotion
+   - **Critical**: This is the main approval gate for production releases
+
+3. **`release`** Environment
+   - **Purpose**: Production release deployment protection  
+   - **Deployment tags**: `v[0-9]*.[0-9]*.[0-9]` (release tags only)
+   - **Protection**: **Required reviewers** for production deployment
+
+### Branch Protection (via Rulesets)
+- **Main branch**: Require PR reviews, status checks, no direct pushes
+- **Required status checks**: CI validation, tests, linting
+- **Squash merge only**: Maintains clean commit history
 
 ### Developer Setup
 
