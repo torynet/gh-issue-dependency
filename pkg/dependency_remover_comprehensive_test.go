@@ -138,7 +138,7 @@ func TestRemoveRelationshipValidation(t *testing.T) {
 				return NewPermissionDeniedError("modify dependencies", "private/repo")
 			},
 			expectedError:    true,
-			expectedErrorMsg: "permission denied",
+			expectedErrorMsg: "Permission denied",
 		},
 	}
 
