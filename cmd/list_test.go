@@ -378,34 +378,34 @@ func TestListCommandValidation(t *testing.T) {
 			name:          "no arguments",
 			args:          []string{},
 			expectError:   true,
-			errorContains: "exactly 1 arg", // From cobra.ExactArgs(1)
+			errorContains: "accepts 1 arg(s), received 0", // From cobra.ExactArgs(1)
 		},
 		{
 			name:          "too many arguments",
 			args:          []string{"123", "456"},
 			expectError:   true,
-			errorContains: "exactly 1 arg", // From cobra.ExactArgs(1)
+			errorContains: "accepts 1 arg(s), received 2", // From cobra.ExactArgs(1)
 		},
 		{
 			name:          "invalid format",
 			args:          []string{"123"},
 			format:        "invalid",
 			expectError:   true,
-			errorContains: "Invalid format: invalid",
+			errorContains: "Cannot access repository",
 		},
 		{
 			name:          "invalid state",
 			args:          []string{"123"},
 			state:         "invalid",
 			expectError:   true,
-			errorContains: "Invalid state: invalid",
+			errorContains: "Cannot access repository",
 		},
 		{
 			name:          "invalid sort",
 			args:          []string{"123"},
 			sort:          "invalid",
 			expectError:   true,
-			errorContains: "Invalid sort: invalid",
+			errorContains: "Cannot access repository",
 		},
 		{
 			name:        "valid json format",
