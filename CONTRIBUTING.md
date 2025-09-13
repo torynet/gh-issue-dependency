@@ -16,7 +16,7 @@ Thank you for your interest in contributing to `gh-issue-dependency`! This guide
 
 ### Prerequisites
 
-- **Go 1.19 or later**: [Install Go](https://golang.org/doc/install)
+- **Go 1.21 or later**: [Install Go](https://golang.org/doc/install)
 - **GitHub CLI**: [Install GitHub CLI](https://cli.github.com/) 
 - **Git**: For version control
 - **Make** (optional): For using the Makefile commands
@@ -110,37 +110,50 @@ gh-issue-dependency/
 
 ## Development Workflow
 
+This project uses a **4-workflow architecture** with trunk-based development. See [docs/release-pipeline.md](docs/release-pipeline.md) for complete details.
+
+### Branch Naming Convention
+
+All branches must follow this pattern:
+```
+(feature|hotfix|epic)/{issue-number}-{description}
+```
+
+Examples:
+- `feature/123-add-user-auth` 
+- `hotfix/456-fix-memory-leak`
+- `epic/789-redesign-ui`
+
 ### Making Changes
 
 1. **Create a feature branch**:
    ```bash
-   git checkout -b feature/your-feature-name
+   # Always include the issue number in branch name
+   git checkout -b feature/27-improve-go-report-grade
    ```
 
 2. **Make your changes** following the code style guidelines
 
-3. **Add tests** for new functionality:
+3. **Test continuously** during development:
    ```bash
-   # Add unit tests in the same package
-   # Add integration tests in tests/ directory
-   ```
-
-4. **Test your changes**:
-   ```bash
-   # Run unit tests
+   # CI validation (runs automatically on push to feature branches)
    go test ./...
+   golangci-lint run
+   gofmt -l .
    
-   # Run integration tests
+   # Integration tests
    ./tests/integration_test.sh
-   
-   # Test manually with your GitHub account
-   go run . list 123 --repo your/test-repo
    ```
 
-5. **Update documentation** if needed:
-   - Update help text in command files
-   - Update README.md for user-facing changes
-   - Update this CONTRIBUTING.md for developer-facing changes
+4. **Create PR with proper title**:
+   ```bash
+   # PR title MUST start with issue number
+   gh pr create --title "27: Improve Go Report Card grade from C to A" --body "..."
+   ```
+
+5. **Squash merge to main** after approval:
+   - Use conventional commit format: `feat: improve Go Report Card grade from C to A`
+   - This triggers automatic RC creation and beta deployment
 
 ### Using the Makefile
 
@@ -355,30 +368,45 @@ Brief description of changes
 
 ## Release Process
 
-### Versioning
+**Releases are fully automated** through the 4-workflow pipeline. See [docs/release-pipeline.md](docs/release-pipeline.md) for complete details.
 
-We use [Semantic Versioning](https://semver.org/):
+### Automatic Release Flow
 
-- **MAJOR**: Breaking changes
-- **MINOR**: New features (backwards compatible)
-- **PATCH**: Bug fixes (backwards compatible)
+1. **Development**: Create feature branch → PR → Squash merge to main
+2. **RC Creation**: Main commit with conventional format → RC tag created automatically
+3. **Beta Testing**: RC tag → Beta deployment → Pre-release created for testing
+4. **Production Promotion**: Manual approval → Production release tag created
+5. **Production Release**: Release tag → Production binaries built and published
 
-### Release Steps
+### Conventional Commits
 
-1. **Update version** in relevant files
-2. **Update CHANGELOG.md** with changes since last release
-3. **Create git tag**: `git tag v1.2.3`
-4. **Push tag**: `git push origin v1.2.3`
-5. **GitHub Actions** will automatically build and release
+Use conventional commit format for automatic version calculation:
 
-### Pre-release Testing
+- **`feat:`** - New features (minor version bump)
+- **`fix:`** - Bug fixes (patch version bump)  
+- **`feat!:` or `fix!:`** - Breaking changes (major version bump)
+- **`docs:`**, `style:`, `refactor:`, `test:`, `chore:` - No version bump
 
-Before major releases:
+### Manual Release Override
 
-1. Test with multiple GitHub repositories
-2. Test cross-repository functionality
-3. Verify all examples in documentation work
-4. Test installation methods
+For emergency releases or special cases:
+
+```bash
+# Manually trigger RC creation
+gh workflow run rc.yml
+
+# Manually trigger beta deployment for specific RC
+gh workflow run beta.yml -f tag=v1.0.0-rc1  
+
+# Manually trigger production release
+gh workflow run release.yml -f tag=v1.0.0
+```
+
+### Release Approval
+
+- **Beta releases**: Automatic for testing
+- **Production releases**: Require manual approval from maintainers
+- **Approval environments**: `beta-approval` and `release` with required reviewers
 
 ## Getting Help
 
