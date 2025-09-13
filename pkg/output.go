@@ -186,12 +186,12 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 			}
 
 			if err := f.write("\n"); err != nil {
-		return err
-	}
+				return err
+			}
 		}
 		if err := f.write("\n"); err != nil {
-		return err
-	}
+			return err
+		}
 	}
 
 	// BLOCKS section
@@ -244,12 +244,12 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 			}
 
 			if err := f.write("\n"); err != nil {
-		return err
-	}
+				return err
+			}
 		}
 		if err := f.write("\n"); err != nil {
-		return err
-	}
+			return err
+		}
 	}
 
 	// Empty state handling
@@ -324,12 +324,12 @@ func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 			}
 
 			if err := f.write("\n"); err != nil {
-		return err
-	}
+				return err
+			}
 		}
 		if err := f.write("\n"); err != nil {
-		return err
-	}
+			return err
+		}
 	}
 
 	// BLOCKS section
@@ -361,12 +361,12 @@ func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 			}
 
 			if err := f.write("\n"); err != nil {
-		return err
-	}
+				return err
+			}
 		}
 		if err := f.write("\n"); err != nil {
-		return err
-	}
+			return err
+		}
 	}
 
 	// Empty state handling
@@ -457,8 +457,8 @@ func (f *OutputFormatter) formatCSVOutput(data *DependencyData) error {
 				escapeCSV(dep.Issue.HTMLURL))
 		}
 		if err := f.write("\n"); err != nil {
-		return err
-	}
+			return err
+		}
 	}
 
 	// Blocking dependencies
@@ -476,8 +476,8 @@ func (f *OutputFormatter) formatCSVOutput(data *DependencyData) error {
 				escapeCSV(dep.Issue.HTMLURL))
 		}
 		if err := f.write("\n"); err != nil {
-		return err
-	}
+			return err
+		}
 	}
 
 	return nil
