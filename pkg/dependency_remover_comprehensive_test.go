@@ -240,9 +240,10 @@ func TestDryRunPreview(t *testing.T) {
 			assert.False(t, tt.shouldExecute, "Dry run should not execute deletion")
 
 			// Verify relationship symbols
-			if tt.relType == "blocked-by" {
+			switch tt.relType {
+			case "blocked-by":
 				assert.Contains(t, output, "←", "Blocked-by should use ← arrow")
-			} else if tt.relType == "blocks" {
+			case "blocks":
 				assert.Contains(t, output, "→", "Blocks should use → arrow")
 			}
 

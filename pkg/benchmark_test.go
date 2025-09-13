@@ -226,9 +226,7 @@ func BenchmarkRepositoryParsing(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			for _, tc := range testCases {
 				_, _, err := ParseRepoFlag(tc)
-				if err != nil {
-					// Expected for some test cases
-				}
+				_ = err // Error expected for some test cases
 			}
 		}
 	})
@@ -490,9 +488,7 @@ func BenchmarkConcurrentAccess(b *testing.B) {
 			for pb.Next() {
 				key := getCacheKey("owner", "repo", i)
 				_, found := getFromCache(key)
-				if found {
-					// Unexpected in benchmark environment
-				}
+				_ = found // Should not be found in benchmark environment
 				i++
 			}
 		})

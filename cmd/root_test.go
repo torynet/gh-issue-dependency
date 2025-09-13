@@ -279,7 +279,7 @@ Examples:
 		Version: Version,
 		Run: func(cmd *cobra.Command, args []string) {
 			// If no subcommand is specified, show help
-			cmd.Help()
+			_ = cmd.Help()
 		},
 	}
 
@@ -305,20 +305,20 @@ func TestRootCmdWithEnvVars(t *testing.T) {
 
 	defer func() {
 		if originalGHToken != "" {
-			os.Setenv("GH_TOKEN", originalGHToken)
+			_ = os.Setenv("GH_TOKEN", originalGHToken)
 		} else {
-			os.Unsetenv("GH_TOKEN")
+			_ = os.Unsetenv("GH_TOKEN")
 		}
 		if originalGHRepo != "" {
-			os.Setenv("GH_REPO", originalGHRepo)
+			_ = os.Setenv("GH_REPO", originalGHRepo)
 		} else {
-			os.Unsetenv("GH_REPO")
+			_ = os.Unsetenv("GH_REPO")
 		}
 	}()
 
 	// Set test environment
-	os.Setenv("GH_TOKEN", "test-token")
-	os.Setenv("GH_REPO", "test-owner/test-repo")
+	_ = os.Setenv("GH_TOKEN", "test-token")
+	_ = os.Setenv("GH_REPO", "test-owner/test-repo")
 
 	cmd := createTestRootCmd()
 	cmd.SetArgs([]string{"--help"})

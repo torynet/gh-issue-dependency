@@ -60,7 +60,7 @@ LEARN MORE
 	Version: Version,
 	Run: func(cmd *cobra.Command, args []string) {
 		// If no subcommand is specified, show help
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

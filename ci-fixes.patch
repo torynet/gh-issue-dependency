@@ -1,0 +1,44 @@
+From 64e77394179eab6785a95bcb56a558e1b4a9f432 Mon Sep 17 00:00:00 2001
+From: Tory Netherton <tnetherton@inspirato.com>
+Date: Fri, 12 Sep 2025 22:12:46 -0600
+Subject: [PATCH] fix: resolve CI failures
+
+- Downgrade Go version from 1.25.1 to 1.22 for CI compatibility
+- Update security scan action from broken securecodewarrior to official securego/gosec
+- Addresses golangci-lint version compatibility issues
+---
+ .github/workflows/ci.yml | 4 ++--
+ go.mod                   | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index e882606..bd4ed1a 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -153,9 +153,9 @@ jobs:
+           go-version: "1.21"
+ 
+       - name: Run Gosec Security Scanner
+-        uses: securecodewarrior/github-action-gosec@master
++        uses: securego/gosec@master
+         with:
+-          args: "-no-fail -fmt sarif -out results.sarif ./..."
++          args: '-fmt sarif -out results.sarif ./...'
+ 
+       - name: Upload SARIF file
+         uses: github/codeql-action/upload-sarif@v2
+diff --git a/go.mod b/go.mod
+index 7060c60..f263e91 100644
+--- a/go.mod
++++ b/go.mod
+@@ -1,6 +1,6 @@
+ module github.com/torynet/gh-issue-dependency
+ 
+-go 1.25.1
++go 1.22
+ 
+ require (
+ 	github.com/cli/go-gh/v2 v2.4.0
+-- 
+2.51.0.windows.1
+
