@@ -124,7 +124,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
 
       - name: Cache Go modules
         uses: actions/cache@v3
@@ -132,7 +132,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-1.21-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-1.22-${{ hashFiles('**/go.sum') }}
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -150,7 +150,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
 
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
@@ -186,7 +186,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
 
       - name: Cache Go modules
         uses: actions/cache@v3
@@ -194,7 +194,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-1.21-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-1.22-${{ hashFiles('**/go.sum') }}
 
       - name: Build binary
         env:
@@ -224,7 +224,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
 
       - name: Check if go.mod is tidy
         run: |
@@ -246,7 +246,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
 
       - name: Download dependencies
         run: go mod download
@@ -273,7 +273,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
 
       - name: Download dependencies
         run: go mod download
