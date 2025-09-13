@@ -636,7 +636,7 @@ func getFromCache(key string) (*DependencyData, bool) {
 	// Check if cache entry has expired
 	if time.Now().After(entry.ExpiresAt) {
 		// Remove expired cache file
-		os.Remove(cachePath)
+		_ = os.Remove(cachePath) // Ignore cleanup errors
 		return nil, false
 	}
 
@@ -666,7 +666,10 @@ func saveToCache(key string, data *DependencyData) {
 
 	// Write to cache file
 	cachePath := filepath.Join(cacheDir, key+".json")
-	os.WriteFile(cachePath, jsonData, 0644)
+	if err := os.WriteFile(cachePath, jsonData, 0644); err != nil {
+		// Log error but don't fail the main operation
+		fmt.Fprintf(os.Stderr, "Warning: failed to write cache file: %v\n", err)
+	}
 }
 
 // CleanExpiredCache removes expired cache entries
@@ -702,13 +705,13 @@ func CleanExpiredCache() error {
 		var entry CacheEntry
 		if err := json.Unmarshal(data, &entry); err != nil {
 			// Remove malformed cache files
-			os.Remove(cachePath)
+			_ = os.Remove(cachePath) // Ignore cleanup errors
 			continue
 		}
 
 		// Remove expired entries
 		if now.After(entry.ExpiresAt) {
-			os.Remove(cachePath)
+			_ = os.Remove(cachePath) // Ignore cleanup errors
 		}
 	}
 
@@ -1097,9 +1100,12 @@ func (r *DependencyRemover) requestConfirmation(source, target IssueRef, relType
 	fmt.Printf("Continue? (y/N): ")
 
 	var response string
-	fmt.Scanln(&response)
-
-	response = strings.ToLower(strings.TrimSpace(response))
+	if _, err := fmt.Scanln(&response); err != nil {
+		// Default to "no" on input error for safety
+		response = "n"
+	} else {
+		response = strings.ToLower(strings.TrimSpace(response))
+	}
 	return response == "y" || response == "yes", nil
 }
 
@@ -1109,9 +1115,12 @@ func (r *DependencyRemover) requestBasicConfirmation(source, target IssueRef, re
 	fmt.Printf("Continue? (y/N): ")
 
 	var response string
-	fmt.Scanln(&response)
-
-	response = strings.ToLower(strings.TrimSpace(response))
+	if _, err := fmt.Scanln(&response); err != nil {
+		// Default to "no" on input error for safety
+		response = "n"
+	} else {
+		response = strings.ToLower(strings.TrimSpace(response))
+	}
 	return response == "y" || response == "yes", nil
 }
 
@@ -1130,9 +1139,12 @@ func (r *DependencyRemover) requestBatchConfirmation(source IssueRef, targets []
 	fmt.Printf("Continue? (y/N): ")
 
 	var response string
-	fmt.Scanln(&response)
-
-	response = strings.ToLower(strings.TrimSpace(response))
+	if _, err := fmt.Scanln(&response); err != nil {
+		// Default to "no" on input error for safety
+		response = "n"
+	} else {
+		response = strings.ToLower(strings.TrimSpace(response))
+	}
 	return response == "y" || response == "yes", nil
 }
 

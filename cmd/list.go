@@ -1,8 +1,10 @@
+// Package cmd provides command-line interface commands for gh-issue-dependency.
 package cmd
 
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -177,7 +179,12 @@ func fetchAndDisplayDependencies(owner, repo string, issueNum int, format, state
 	defer cancel()
 
 	// Clean expired cache entries periodically (fail silently if error)
-	go pkg.CleanExpiredCache()
+	go func() {
+		if err := pkg.CleanExpiredCache(); err != nil {
+			// Log error but don't fail main operation since this is background cleanup
+			fmt.Fprintf(os.Stderr, "Warning: failed to clean expired cache: %v\n", err)
+		}
+	}()
 
 	// Fetch dependency data from GitHub API
 	originalData, err := pkg.FetchIssueDependencies(ctx, owner, repo, issueNum)

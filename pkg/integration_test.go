@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -111,11 +112,12 @@ func TestIntegrationWorkflow(t *testing.T) {
 	// Test 5: Validation Error Scenarios
 	t.Run("ValidationErrorScenarios", func(t *testing.T) {
 		// Test self-reference detection
-		selfRef := CreateIssueRef("owner", "repo", 123)
+		source := CreateIssueRef("owner", "repo", 123)
+		target := CreateIssueRef("owner", "repo", 123) // Same as source - should be detected as self-reference
 
 		// In real validation, this would be caught by ValidateRemoval
-		if selfRef.Owner == selfRef.Owner && selfRef.Repo == selfRef.Repo &&
-			selfRef.Number == selfRef.Number {
+		if source.Owner == target.Owner && source.Repo == target.Repo &&
+			source.Number == target.Number {
 			t.Log("✅ Self-reference detection logic available")
 		}
 
@@ -166,7 +168,7 @@ func TestAPIIntegrationPoints(t *testing.T) {
 
 		expectedEndpoint := "repos/testowner/testrepo/issues/123/dependencies/target/repo#456"
 		actualEndpoint := "repos/" + source.Owner + "/" + source.Repo + "/issues/" +
-			string(rune(source.Number)) + "/dependencies/" + relationshipID
+			fmt.Sprintf("%d", source.Number) + "/dependencies/" + relationshipID
 
 		// Note: This is a simplified test - actual implementation uses fmt.Sprintf
 		if len(expectedEndpoint) == 0 || len(actualEndpoint) == 0 {

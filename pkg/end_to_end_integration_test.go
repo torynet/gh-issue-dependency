@@ -136,7 +136,7 @@ func (env *MockIntegrationEnvironment) RemoveDependency(source, target IssueRef,
 func removeDependencyFromSlice(deps []IssueRef, target IssueRef) []IssueRef {
 	var result []IssueRef
 	for _, dep := range deps {
-		if !(dep.Owner == target.Owner && dep.Repo == target.Repo && dep.Number == target.Number) {
+		if dep.Owner != target.Owner || dep.Repo != target.Repo || dep.Number != target.Number {
 			result = append(result, dep)
 		}
 	}
@@ -237,7 +237,7 @@ func TestEndToEndSingleDependencyRemoval(t *testing.T) {
 
 				source := CreateIssueRef("owner", "repo", 123)
 				target := CreateIssueRef("owner", "repo", 456)
-				env.AddDependency(source, target, "blocked-by")
+				_ = env.AddDependency(source, target, "blocked-by")
 			},
 			source:           CreateIssueRef("owner", "repo", 123),
 			target:           CreateIssueRef("owner", "repo", 456),
@@ -263,7 +263,7 @@ func TestEndToEndSingleDependencyRemoval(t *testing.T) {
 
 				source := CreateIssueRef("owner", "repo", 123)
 				target := CreateIssueRef("owner", "repo", 789)
-				env.AddDependency(source, target, "blocks")
+				_ = env.AddDependency(source, target, "blocks")
 			},
 			source:           CreateIssueRef("owner", "repo", 123),
 			target:           CreateIssueRef("owner", "repo", 789),
@@ -287,7 +287,7 @@ func TestEndToEndSingleDependencyRemoval(t *testing.T) {
 
 				source := CreateIssueRef("owner", "repo", 123)
 				target := CreateIssueRef("owner", "repo", 456)
-				env.AddDependency(source, target, "blocked-by")
+				_ = env.AddDependency(source, target, "blocked-by")
 			},
 			source:           CreateIssueRef("owner", "repo", 123),
 			target:           CreateIssueRef("owner", "repo", 456),
@@ -312,7 +312,7 @@ func TestEndToEndSingleDependencyRemoval(t *testing.T) {
 
 				source := CreateIssueRef("owner", "repo", 123)
 				target := CreateIssueRef("owner", "repo", 456)
-				env.AddDependency(source, target, "blocked-by")
+				_ = env.AddDependency(source, target, "blocked-by")
 			},
 			source:           CreateIssueRef("owner", "repo", 123),
 			target:           CreateIssueRef("owner", "repo", 456),
@@ -337,7 +337,7 @@ func TestEndToEndSingleDependencyRemoval(t *testing.T) {
 
 				source := CreateIssueRef("owner", "backend", 123)
 				target := CreateIssueRef("owner", "frontend", 456)
-				env.AddDependency(source, target, "blocks")
+				_ = env.AddDependency(source, target, "blocks")
 			},
 			source:           CreateIssueRef("owner", "backend", 123),
 			target:           CreateIssueRef("owner", "frontend", 456),
@@ -497,9 +497,9 @@ func TestEndToEndBatchDependencyRemoval(t *testing.T) {
 				repo.AddIssue(101, "Infrastructure")
 
 				source := CreateIssueRef("owner", "repo", 123)
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 456), "blocked-by")
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 789), "blocked-by")
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 101), "blocked-by")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 456), "blocked-by")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 789), "blocked-by")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 101), "blocked-by")
 			},
 			source: CreateIssueRef("owner", "repo", 123),
 			targets: []IssueRef{
@@ -531,8 +531,8 @@ func TestEndToEndBatchDependencyRemoval(t *testing.T) {
 				// Note: Issue 999 doesn't exist, simulating partial failure
 
 				source := CreateIssueRef("owner", "repo", 123)
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 456), "blocks")
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 101), "blocks")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 456), "blocks")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 101), "blocks")
 				// No dependency for 999 - will cause failure
 			},
 			source: CreateIssueRef("owner", "repo", 123),
@@ -560,8 +560,8 @@ func TestEndToEndBatchDependencyRemoval(t *testing.T) {
 				repo.AddIssue(789, "API Design")
 
 				source := CreateIssueRef("owner", "repo", 123)
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 456), "blocked-by")
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 789), "blocked-by")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 456), "blocked-by")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 789), "blocked-by")
 			},
 			source: CreateIssueRef("owner", "repo", 123),
 			targets: []IssueRef{
@@ -593,8 +593,8 @@ func TestEndToEndBatchDependencyRemoval(t *testing.T) {
 				mobileRepo.AddIssue(789, "Mobile App")
 
 				source := CreateIssueRef("owner", "backend", 123)
-				env.AddDependency(source, CreateIssueRef("owner", "frontend", 456), "blocks")
-				env.AddDependency(source, CreateIssueRef("owner", "mobile", 789), "blocks")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "frontend", 456), "blocks")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "mobile", 789), "blocks")
 			},
 			source: CreateIssueRef("owner", "backend", 123),
 			targets: []IssueRef{
@@ -686,7 +686,7 @@ func TestEndToEndBatchDependencyRemoval(t *testing.T) {
 					env.AddOutput("Batch dependency removal completed successfully")
 				}
 			} else if tt.opts.DryRun {
-				env.AddOutput(fmt.Sprintf("Dry run: batch dependency removal preview"))
+				env.AddOutput("Dry run: batch dependency removal preview")
 				env.AddOutput(fmt.Sprintf("Would remove %d relationships:", len(tt.targets)))
 				env.AddOutput("No changes made")
 			}
@@ -745,11 +745,11 @@ func TestEndToEndRemoveAllWorkflow(t *testing.T) {
 
 				source := CreateIssueRef("owner", "repo", 123)
 				// Add blocked-by relationships
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 456), "blocked-by")
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 789), "blocked-by")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 456), "blocked-by")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 789), "blocked-by")
 				// Add blocks relationships
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 101), "blocks")
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 202), "blocks")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 101), "blocks")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 202), "blocks")
 			},
 			issue:            CreateIssueRef("owner", "repo", 123),
 			opts:             RemoveOptions{DryRun: false, Force: true},
@@ -789,8 +789,8 @@ func TestEndToEndRemoveAllWorkflow(t *testing.T) {
 				repo.AddIssue(789, "Frontend Work")
 
 				source := CreateIssueRef("owner", "repo", 123)
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 456), "blocked-by")
-				env.AddDependency(source, CreateIssueRef("owner", "repo", 789), "blocks")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 456), "blocked-by")
+				_ = env.AddDependency(source, CreateIssueRef("owner", "repo", 789), "blocks")
 			},
 			issue:            CreateIssueRef("owner", "repo", 123),
 			opts:             RemoveOptions{DryRun: true, Force: false},
@@ -855,7 +855,7 @@ func TestEndToEndRemoveAllWorkflow(t *testing.T) {
 						strings.Split(dep.Repository, "/")[1],
 						dep.Issue.Number,
 					)
-					env.RemoveDependency(tt.issue, target, "blocked-by")
+					_ = env.RemoveDependency(tt.issue, target, "blocked-by")
 				}
 
 				// Remove all blocking relationships
@@ -866,7 +866,7 @@ func TestEndToEndRemoveAllWorkflow(t *testing.T) {
 						strings.Split(dep.Repository, "/")[1],
 						dep.Issue.Number,
 					)
-					env.RemoveDependency(tt.issue, target, "blocks")
+					_ = env.RemoveDependency(tt.issue, target, "blocks")
 				}
 
 				env.AddOutput(fmt.Sprintf("✅ Removed all dependency relationships for %s", tt.issue.String()))

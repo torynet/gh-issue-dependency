@@ -362,7 +362,7 @@ func TestCacheOperations(t *testing.T) {
 	// Create temporary cache directory for testing
 	tempDir, err := os.MkdirTemp("", "gh-issue-dependency-test-cache")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Note: we can't actually change the const CacheDir for testing
 	// In a production system, we'd make getCacheDir() configurable

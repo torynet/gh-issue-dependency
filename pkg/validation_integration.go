@@ -148,14 +148,15 @@ func (e *RemovalExecutor) promptConfirmation(source IssueRef, targets []IssueRef
 
 	fmt.Print("Continue? (y/N): ")
 
-	// In a real implementation, this would read from stdin
-	// For now, we'll simulate confirmation
-	// TODO: Implement actual stdin reading for confirmation
-	return false, NewAppError(
-		ErrorTypeInternal,
-		"User confirmation not implemented yet",
-		nil,
-	).WithSuggestion("Use --force to skip confirmation prompts")
+	var response string
+	if _, err := fmt.Scanln(&response); err != nil {
+		// Default to "no" on input error for safety
+		response = "n"
+	} else {
+		response = strings.ToLower(strings.TrimSpace(response))
+	}
+
+	return response == "y" || response == "yes", nil
 }
 
 // executeRemoval performs the actual removal operation

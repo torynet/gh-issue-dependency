@@ -64,6 +64,12 @@ func NewOutputFormatter(options *OutputOptions) *OutputFormatter {
 	}
 }
 
+// write is a helper method to handle fmt.Fprintf errors consistently
+func (f *OutputFormatter) write(format string, args ...interface{}) error {
+	_, err := fmt.Fprintf(f.options.Writer, format, args...)
+	return err
+}
+
 // IsTerminal detects if the output is going to a terminal/TTY
 func IsTerminal() bool {
 	return isatty.IsTerminal(os.Stdout.Fd())
@@ -113,31 +119,43 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 	muted := f.colorize(termenv.ANSIBrightBlack)
 
 	// Issue title and header
-	fmt.Fprintf(f.options.Writer, "%s\nDependencies for: #%d - %s%s\n",
-		title(""), data.SourceIssue.Number, data.SourceIssue.Title, termenv.CSI+termenv.ResetSeq)
+	if err := f.write("%s\nDependencies for: #%d - %s%s\n",
+		title(""), data.SourceIssue.Number, data.SourceIssue.Title, termenv.CSI+termenv.ResetSeq); err != nil {
+		return err
+	}
 
 	// Repository context
 	if !data.SourceIssue.Repository.IsEmpty() {
-		fmt.Fprintf(f.options.Writer, "%sRepository: %s%s\n",
-			muted(""), data.SourceIssue.Repository, termenv.CSI+termenv.ResetSeq)
+		if err := f.write("%sRepository: %s%s\n",
+			muted(""), data.SourceIssue.Repository, termenv.CSI+termenv.ResetSeq); err != nil {
+			return err
+		}
 	}
 
-	fmt.Fprintf(f.options.Writer, "\n")
+	if err := f.write("\n"); err != nil {
+		return err
+	}
 
 	// BLOCKED BY section
 	if len(data.BlockedBy) > 0 {
-		fmt.Fprintf(f.options.Writer, "%sBLOCKED BY (%d issues)%s\n",
-			header(""), len(data.BlockedBy), termenv.CSI+termenv.ResetSeq)
-		fmt.Fprintf(f.options.Writer, "%s────────────────────%s\n",
-			separator(""), termenv.CSI+termenv.ResetSeq)
+		if err := f.write("%sBLOCKED BY (%d issues)%s\n",
+			header(""), len(data.BlockedBy), termenv.CSI+termenv.ResetSeq); err != nil {
+			return err
+		}
+		if err := f.write("%s────────────────────%s\n",
+			separator(""), termenv.CSI+termenv.ResetSeq); err != nil {
+			return err
+		}
 
 		for _, dep := range data.BlockedBy {
 			emoji := f.getStateEmoji(dep.Issue.State)
 			stateColor := f.getStateColor(dep.Issue.State)
 
-			fmt.Fprintf(f.options.Writer, "%s #%-6d %s %s[%s]%s",
+			if err := f.write("%s #%-6d %s %s[%s]%s",
 				emoji, dep.Issue.Number, dep.Issue.Title,
-				stateColor(""), dep.Issue.State, termenv.CSI+termenv.ResetSeq)
+				stateColor(""), dep.Issue.State, termenv.CSI+termenv.ResetSeq); err != nil {
+				return err
+			}
 
 			// Show assignees if available
 			if len(dep.Issue.Assignees) > 0 {
@@ -145,41 +163,57 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 				for i, assignee := range dep.Issue.Assignees {
 					assigneeNames[i] = "@" + assignee.Login
 				}
-				fmt.Fprintf(f.options.Writer, " %s%s%s",
-					info(""), strings.Join(assigneeNames, ", "), termenv.CSI+termenv.ResetSeq)
+				if err := f.write(" %s%s%s",
+					info(""), strings.Join(assigneeNames, ", "), termenv.CSI+termenv.ResetSeq); err != nil {
+					return err
+				}
 			}
 
 			// Show repository context for cross-repo dependencies
 			if dep.Repository != data.SourceIssue.Repository.String() {
-				fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
-					muted(""), dep.Repository, termenv.CSI+termenv.ResetSeq)
+				if err := f.write("\n         %s%s%s",
+					muted(""), dep.Repository, termenv.CSI+termenv.ResetSeq); err != nil {
+					return err
+				}
 			}
 
 			// Show URL for easy navigation
 			if dep.Issue.HTMLURL != "" {
-				fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
-					muted(""), dep.Issue.HTMLURL, termenv.CSI+termenv.ResetSeq)
+				if err := f.write("\n         %s%s%s",
+					muted(""), dep.Issue.HTMLURL, termenv.CSI+termenv.ResetSeq); err != nil {
+					return err
+				}
 			}
 
-			fmt.Fprintf(f.options.Writer, "\n")
+			if err := f.write("\n"); err != nil {
+		return err
+	}
 		}
-		fmt.Fprintf(f.options.Writer, "\n")
+		if err := f.write("\n"); err != nil {
+		return err
+	}
 	}
 
 	// BLOCKS section
 	if len(data.Blocking) > 0 {
-		fmt.Fprintf(f.options.Writer, "%sBLOCKS (%d issues)%s\n",
-			header(""), len(data.Blocking), termenv.CSI+termenv.ResetSeq)
-		fmt.Fprintf(f.options.Writer, "%s──────────────────%s\n",
-			separator(""), termenv.CSI+termenv.ResetSeq)
+		if err := f.write("%sBLOCKS (%d issues)%s\n",
+			header(""), len(data.Blocking), termenv.CSI+termenv.ResetSeq); err != nil {
+			return err
+		}
+		if err := f.write("%s──────────────────%s\n",
+			separator(""), termenv.CSI+termenv.ResetSeq); err != nil {
+			return err
+		}
 
 		for _, dep := range data.Blocking {
 			emoji := f.getStateEmoji(dep.Issue.State)
 			stateColor := f.getStateColor(dep.Issue.State)
 
-			fmt.Fprintf(f.options.Writer, "%s #%-6d %s %s[%s]%s",
+			if err := f.write("%s #%-6d %s %s[%s]%s",
 				emoji, dep.Issue.Number, dep.Issue.Title,
-				stateColor(""), dep.Issue.State, termenv.CSI+termenv.ResetSeq)
+				stateColor(""), dep.Issue.State, termenv.CSI+termenv.ResetSeq); err != nil {
+				return err
+			}
 
 			// Show assignees if available
 			if len(dep.Issue.Assignees) > 0 {
@@ -187,40 +221,56 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 				for i, assignee := range dep.Issue.Assignees {
 					assigneeNames[i] = "@" + assignee.Login
 				}
-				fmt.Fprintf(f.options.Writer, " %s%s%s",
-					info(""), strings.Join(assigneeNames, ", "), termenv.CSI+termenv.ResetSeq)
+				if err := f.write(" %s%s%s",
+					info(""), strings.Join(assigneeNames, ", "), termenv.CSI+termenv.ResetSeq); err != nil {
+					return err
+				}
 			}
 
 			// Show repository context for cross-repo dependencies
 			if dep.Repository != data.SourceIssue.Repository.String() {
-				fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
-					muted(""), dep.Repository, termenv.CSI+termenv.ResetSeq)
+				if err := f.write("\n         %s%s%s",
+					muted(""), dep.Repository, termenv.CSI+termenv.ResetSeq); err != nil {
+					return err
+				}
 			}
 
 			// Show URL for easy navigation
 			if dep.Issue.HTMLURL != "" {
-				fmt.Fprintf(f.options.Writer, "\n         %s%s%s",
-					muted(""), dep.Issue.HTMLURL, termenv.CSI+termenv.ResetSeq)
+				if err := f.write("\n         %s%s%s",
+					muted(""), dep.Issue.HTMLURL, termenv.CSI+termenv.ResetSeq); err != nil {
+					return err
+				}
 			}
 
-			fmt.Fprintf(f.options.Writer, "\n")
+			if err := f.write("\n"); err != nil {
+		return err
+	}
 		}
-		fmt.Fprintf(f.options.Writer, "\n")
+		if err := f.write("\n"); err != nil {
+		return err
+	}
 	}
 
 	// Empty state handling
 	if data.TotalCount == 0 {
 		mainMsg, tipMsg := f.getEmptyStateMessage(data)
-		fmt.Fprintf(f.options.Writer, "%s💡 %s%s\n\n",
-			info(""), mainMsg, termenv.CSI+termenv.ResetSeq)
-		fmt.Fprintf(f.options.Writer, "%s%s%s\n",
-			muted(""), tipMsg, termenv.CSI+termenv.ResetSeq)
+		if err := f.write("%s💡 %s%s\n\n",
+			info(""), mainMsg, termenv.CSI+termenv.ResetSeq); err != nil {
+			return err
+		}
+		if err := f.write("%s%s%s\n",
+			muted(""), tipMsg, termenv.CSI+termenv.ResetSeq); err != nil {
+			return err
+		}
 	}
 
 	// Footer with metadata
 	if f.options.Detailed {
-		fmt.Fprintf(f.options.Writer, "%sFetched at: %s%s\n",
-			muted(""), data.FetchedAt.Format(time.RFC3339), termenv.CSI+termenv.ResetSeq)
+		if err := f.write("%sFetched at: %s%s\n",
+			muted(""), data.FetchedAt.Format(time.RFC3339), termenv.CSI+termenv.ResetSeq); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -229,17 +279,25 @@ func (f *OutputFormatter) formatTTYOutput(data *DependencyData) error {
 // formatPlainOutput formats output for plain text without colors or emojis
 func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 	// Header
-	fmt.Fprintf(f.options.Writer, "Dependencies for: #%d - %s\n",
-		data.SourceIssue.Number, data.SourceIssue.Title)
+	if err := f.write("Dependencies for: #%d - %s\n",
+		data.SourceIssue.Number, data.SourceIssue.Title); err != nil {
+		return err
+	}
 
 	if !data.SourceIssue.Repository.IsEmpty() {
-		fmt.Fprintf(f.options.Writer, "Repository: %s\n", data.SourceIssue.Repository)
+		if err := f.write("Repository: %s\n", data.SourceIssue.Repository); err != nil {
+			return err
+		}
 	}
-	fmt.Fprintf(f.options.Writer, "\n")
+	if err := f.write("\n"); err != nil {
+		return err
+	}
 
 	// BLOCKED BY section
 	if len(data.BlockedBy) > 0 {
-		fmt.Fprintf(f.options.Writer, "BLOCKED BY (%d issues)\n", len(data.BlockedBy))
+		if err := f.write("BLOCKED BY (%d issues)\n", len(data.BlockedBy)); err != nil {
+			return err
+		}
 		fmt.Fprintf(f.options.Writer, "========================\n")
 
 		for _, dep := range data.BlockedBy {
@@ -265,9 +323,13 @@ func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 				fmt.Fprintf(f.options.Writer, "\n       URL: %s", dep.Issue.HTMLURL)
 			}
 
-			fmt.Fprintf(f.options.Writer, "\n")
+			if err := f.write("\n"); err != nil {
+		return err
+	}
 		}
-		fmt.Fprintf(f.options.Writer, "\n")
+		if err := f.write("\n"); err != nil {
+		return err
+	}
 	}
 
 	// BLOCKS section
@@ -298,9 +360,13 @@ func (f *OutputFormatter) formatPlainOutput(data *DependencyData) error {
 				fmt.Fprintf(f.options.Writer, "\n       URL: %s", dep.Issue.HTMLURL)
 			}
 
-			fmt.Fprintf(f.options.Writer, "\n")
+			if err := f.write("\n"); err != nil {
+		return err
+	}
 		}
-		fmt.Fprintf(f.options.Writer, "\n")
+		if err := f.write("\n"); err != nil {
+		return err
+	}
 	}
 
 	// Empty state handling
@@ -372,7 +438,9 @@ func (f *OutputFormatter) formatCSVOutput(data *DependencyData) error {
 			escapeCSV(formatLabelsForCSV(data.SourceIssue.Labels)),
 			escapeCSV(data.SourceIssue.HTMLURL))
 	}
-	fmt.Fprintf(f.options.Writer, "\n")
+	if err := f.write("\n"); err != nil {
+		return err
+	}
 
 	// Blocked by dependencies
 	for _, dep := range data.BlockedBy {
@@ -388,7 +456,9 @@ func (f *OutputFormatter) formatCSVOutput(data *DependencyData) error {
 				escapeCSV(formatLabelsForCSV(dep.Issue.Labels)),
 				escapeCSV(dep.Issue.HTMLURL))
 		}
-		fmt.Fprintf(f.options.Writer, "\n")
+		if err := f.write("\n"); err != nil {
+		return err
+	}
 	}
 
 	// Blocking dependencies
@@ -405,7 +475,9 @@ func (f *OutputFormatter) formatCSVOutput(data *DependencyData) error {
 				escapeCSV(formatLabelsForCSV(dep.Issue.Labels)),
 				escapeCSV(dep.Issue.HTMLURL))
 		}
-		fmt.Fprintf(f.options.Writer, "\n")
+		if err := f.write("\n"); err != nil {
+		return err
+	}
 	}
 
 	return nil

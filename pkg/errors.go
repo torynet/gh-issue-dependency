@@ -1,3 +1,4 @@
+// Package pkg provides core functionality for GitHub issue dependency management.
 package pkg
 
 import (
