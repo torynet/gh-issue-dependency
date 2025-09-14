@@ -317,7 +317,7 @@ main() {
         ./gh-issue-dependency --help > /dev/null
     done
     print_status "PASS" "Multiple invocations completed (basic memory test)"
-    ((TESTS_PASSED++))
+    TESTS_PASSED=$((TESTS_PASSED + 1))
     TESTS_RUN=$((TESTS_RUN + 1))
     
     # Test 36: Signal handling
@@ -365,7 +365,7 @@ main() {
     (./gh-issue-dependency --help > /dev/null 2>&1) &
     wait
     print_status "PASS" "Concurrent execution completed safely"
-    ((TESTS_PASSED++))
+    TESTS_PASSED=$((TESTS_PASSED + 1))
     TESTS_RUN=$((TESTS_RUN + 1))
     
     # Test 40: Integration test completeness verification
@@ -373,9 +373,9 @@ main() {
     
     # Verify all main commands are tested
     commands_tested=0
-    if echo "$help_output" | grep -q "list.*List"; then ((commands_tested++)); fi
-    if echo "$help_output" | grep -q "add.*Add"; then ((commands_tested++)); fi  
-    if echo "$help_output" | grep -q "remove.*Remove"; then ((commands_tested++)); fi
+    if echo "$help_output" | grep -q "list.*List"; then commands_tested=$((commands_tested + 1)); fi
+    if echo "$help_output" | grep -q "add.*Add"; then commands_tested=$((commands_tested + 1)); fi  
+    if echo "$help_output" | grep -q "remove.*Remove"; then commands_tested=$((commands_tested + 1)); fi
     
     if [ $commands_tested -eq 3 ]; then
         print_status "PASS" "All main commands covered in tests ($commands_tested/3)"
