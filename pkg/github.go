@@ -221,8 +221,12 @@ func ValidateRepoAccess(owner, repo string) error {
 	}
 
 	// Use gh CLI to check repository access
+	// Validate repository name format to prevent command injection
 	repoName := fmt.Sprintf("%s/%s", owner, repo)
-	cmd := exec.Command("gh", "repo", "view", repoName, "--json", "id")
+	if !regexp.MustCompile(`^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$`).MatchString(repoName) {
+		return fmt.Errorf("invalid repository name format: %s", repoName)
+	}
+	cmd := exec.Command("gh", "repo", "view", repoName, "--json", "id") // #nosec G204 -- repoName validated with strict regex
 	output, err := cmd.Output()
 	if err != nil {
 		if isGhNotFound(err) {
@@ -616,13 +620,18 @@ func getFromCache(key string) (*DependencyData, bool) {
 	cacheDir := getCacheDir()
 	cachePath := filepath.Join(cacheDir, key+".json")
 
+	// Validate path to prevent directory traversal
+	if !strings.HasPrefix(cachePath, cacheDir) {
+		return nil, false
+	}
+
 	// Check if cache file exists
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		return nil, false
 	}
 
 	// Read cache file
-	data, err := os.ReadFile(cachePath)
+	data, err := os.ReadFile(cachePath) // #nosec G304 -- cachePath validated against directory traversal
 	if err != nil {
 		return nil, false
 	}
@@ -695,8 +704,13 @@ func CleanExpiredCache() error {
 
 		cachePath := filepath.Join(cacheDir, file.Name())
 
+		// Validate path to prevent directory traversal
+		if !strings.HasPrefix(cachePath, cacheDir) {
+			continue
+		}
+
 		// Read cache file
-		data, err := os.ReadFile(cachePath)
+		data, err := os.ReadFile(cachePath) // #nosec G304 -- cachePath validated against directory traversal
 		if err != nil {
 			continue
 		}
