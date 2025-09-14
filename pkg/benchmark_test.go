@@ -279,7 +279,7 @@ func BenchmarkCacheOperations(b *testing.B) {
 			issue := issues[i%len(issues)]
 
 			key := getCacheKey(owner, repo, issue)
-			if len(key) != 32 {
+			if len(key) != 64 {
 				b.Fatalf("Invalid cache key length: %d", len(key))
 			}
 		}

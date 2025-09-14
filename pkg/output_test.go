@@ -309,7 +309,8 @@ func TestFormatJSONOutput(t *testing.T) {
 				assert.Equal(t, float64(123), sourceIssue["number"])
 				assert.Equal(t, "Main Feature Implementation", sourceIssue["title"])
 				assert.Equal(t, "open", sourceIssue["state"])
-				assert.Equal(t, "testowner/testrepo", sourceIssue["repository"])
+				repository := sourceIssue["repository"].(map[string]interface{})
+				assert.Equal(t, "testowner/testrepo", repository["full_name"])
 
 				blockedBy := output["blocked_by"].([]interface{})
 				assert.Len(t, blockedBy, 2)

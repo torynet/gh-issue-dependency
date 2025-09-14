@@ -557,7 +557,7 @@ func TestConcurrencyEdgeCases(t *testing.T) {
 
 				// Generate different cache keys
 				key := getCacheKey("owner", "repo", id)
-				assert.Equal(t, 32, len(key), "Cache key should be valid length")
+				assert.Equal(t, 64, len(key), "Cache key should be valid length")
 
 				// Attempt cache operations (these might fail due to permissions)
 				data, found := getFromCache(key)

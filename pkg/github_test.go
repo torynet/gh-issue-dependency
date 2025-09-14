@@ -591,7 +591,7 @@ func TestDataStructures(t *testing.T) {
 		assert.Equal(t, 123, data.SourceIssue.Number)
 		assert.Equal(t, "Test Issue", data.SourceIssue.Title)
 		assert.Equal(t, "open", data.SourceIssue.State)
-		assert.Equal(t, "test/repo", data.SourceIssue.Repository)
+		assert.Equal(t, "test/repo", data.SourceIssue.Repository.FullName)
 		assert.Len(t, data.SourceIssue.Assignees, 1)
 		assert.Equal(t, "testuser", data.SourceIssue.Assignees[0].Login)
 		assert.Len(t, data.SourceIssue.Labels, 1)
