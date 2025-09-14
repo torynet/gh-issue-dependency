@@ -174,7 +174,7 @@ main() {
     # Test 10: Help format is proper
     test_output_contains "Usage section present" "Usage:" ./gh-issue-dependency --help
     test_output_contains "Flags section present" "Flags:" ./gh-issue-dependency --help
-    test_output_contains "Examples section present" "Examples:" ./gh-issue-dependency --help
+    test_output_contains "Examples section present" "EXAMPLES" ./gh-issue-dependency --help
     
     # Test 11: Version template format
     test_output_contains "Version format correct" "gh-issue-dependency version" ./gh-issue-dependency --version
@@ -183,9 +183,9 @@ main() {
     run_test "No panic on empty args" 0 ./gh-issue-dependency
     
     # Test 13: Subcommand help works
-    test_output_contains "Add command help" "Add dependency" ./gh-issue-dependency add --help
+    test_output_contains "Add command help" "Add a dependency relationship" ./gh-issue-dependency add --help
     test_output_contains "List command help" "List dependencies" ./gh-issue-dependency list --help
-    test_output_contains "Remove command help" "Remove dependency" ./gh-issue-dependency remove --help
+    test_output_contains "Remove command help" "Remove existing dependency relationships" ./gh-issue-dependency remove --help
     
     # Test 14: Invalid subcommand shows error
     run_test "Invalid subcommand returns error" 1 ./gh-issue-dependency invalid-command
@@ -201,7 +201,7 @@ main() {
     
     # Test 17: Test build with different flags
     print_status "INFO" "Testing build with version flag..."
-    if go build -ldflags "-X cmd.Version=test-1.0.0" -o gh-issue-dependency-versioned .; then
+    if go build -ldflags "-X github.com/torynet/gh-issue-dependency/cmd.Version=test-1.0.0" -o gh-issue-dependency-versioned .; then
         test_output_contains "Custom version in binary" "test-1.0.0" ./gh-issue-dependency-versioned --version
         rm -f gh-issue-dependency-versioned
     else
@@ -258,13 +258,13 @@ main() {
     
     # Test 27: Add command basic validation
     print_status "INFO" "Testing add command structure"
-    test_output_contains "Add command exists" "Add dependency" ./gh-issue-dependency add --help
+    test_output_contains "Add command exists" "Add a dependency relationship" ./gh-issue-dependency add --help
     run_test "Add command requires arguments" 1 ./gh-issue-dependency add
     test_output_contains "Add command shows usage" "Usage:" ./gh-issue-dependency add --help
     
     # Test 28: Remove command basic validation  
     print_status "INFO" "Testing remove command structure"
-    test_output_contains "Remove command exists" "Remove dependency" ./gh-issue-dependency remove --help
+    test_output_contains "Remove command exists" "Remove existing dependency relationships" ./gh-issue-dependency remove --help
     run_test "Remove command requires arguments" 1 ./gh-issue-dependency remove
     test_output_contains "Remove command shows usage" "Usage:" ./gh-issue-dependency remove --help
     
