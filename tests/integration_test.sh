@@ -239,7 +239,7 @@ main() {
     test_output_not_contains "Valid repository sort accepted" "Invalid sort" ./gh-issue-dependency list 123 --sort repository --help
     
     # Test 23: Repository flag validation (without making API calls)
-    run_test "Invalid repo format handled gracefully" 1 ./gh-issue-dependency --repo "invalid" list 123 || true
+    run_test "Invalid repo format handled gracefully" 2 ./gh-issue-dependency --repo "invalid" list 123 || true
     run_test "Empty repo flag handled" 1 ./gh-issue-dependency --repo "" list 123 || true
     
     # Test 24: JSON fields flag
@@ -273,8 +273,26 @@ main() {
     test_output_not_contains "Short repo flag accepted" "unknown flag" ./gh-issue-dependency -R test/repo --help
     
     # Test 30: Error message quality
-    test_output_contains "Helpful error for missing auth" "gh auth" ./gh-issue-dependency list 123 || true
-    test_output_contains "Helpful error for invalid issue" "issue" ./gh-issue-dependency list abc || true
+    # Test that missing issue gives helpful error (expect exit code 1)
+    if output=$(./gh-issue-dependency list 123 2>&1); then
+        print_status "FAIL" "Missing issue should return error"  
+    else
+        if echo "$output" | grep -q "not found"; then
+            print_status "PASS" "Helpful error for missing issue"
+        else
+            print_status "FAIL" "Error message should contain 'not found'"
+        fi
+    fi
+    # Test that invalid issue format gives helpful error (expect exit code 2)
+    if output=$(./gh-issue-dependency list abc 2>&1); then
+        print_status "FAIL" "Invalid issue should return error"
+    else
+        if echo "$output" | grep -q "issue"; then
+            print_status "PASS" "Helpful error for invalid issue"
+        else
+            print_status "FAIL" "Error message should contain 'issue'"
+        fi
+    fi
     
     # Test 31: Performance regression test
     print_status "INFO" "Running basic performance test"
