@@ -451,7 +451,8 @@ func isErrorRetryable(err error) bool {
 		return strings.Contains(errMsg, "rate limit") ||
 			strings.Contains(errMsg, "500") ||
 			strings.Contains(errMsg, "502") ||
-			strings.Contains(errMsg, "503")
+			strings.Contains(errMsg, "503") ||
+			strings.Contains(errMsg, "temporarily unavailable")
 	}
 
 	return false

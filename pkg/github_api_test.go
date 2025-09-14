@@ -804,7 +804,7 @@ func TestGitHubAPIResponseParsing(t *testing.T) {
 			{
 				name:     "validation error",
 				status:   422,
-				body:     `{"message": "Validation Failed", "errors": [{"field": "dependency", "code": "invalid"}]}`,
+				body:     `{"message": "Validation Failed", "errors": [{"field": "dependency", "code": "invalid"}], "documentation_url": "https://docs.github.com/rest"}`,
 				errorMsg: "Validation Failed",
 			},
 		}
