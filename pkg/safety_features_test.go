@@ -85,19 +85,29 @@ func (h *SafetyTestHarness) RequestConfirmation(source IssueRef, targets []Issue
 		return false, nil // No execution in dry run
 	}
 
-	// Get user response
-	if len(h.userResponses) == 0 {
-		return false, fmt.Errorf("no user response available")
+	// Get user response, handling invalid responses
+	for len(h.userResponses) > 0 {
+		response := h.userResponses[0]
+		h.userResponses = h.userResponses[1:] // Remove used response
+
+		// Process response
+		response = strings.ToLower(strings.TrimSpace(response))
+		
+		// Check for valid responses
+		if response == "y" || response == "yes" {
+			return true, nil
+		}
+		if response == "n" || response == "no" || response == "" {
+			return false, nil // Empty response defaults to "no"
+		}
+		
+		// Invalid response - continue to next response
+		// In a real implementation, this would prompt again
+		continue
 	}
 
-	response := h.userResponses[0]
-	h.userResponses = h.userResponses[1:] // Remove used response
-
-	// Process response
-	response = strings.ToLower(strings.TrimSpace(response))
-	confirmed := response == "y" || response == "yes"
-
-	return confirmed, nil
+	// No valid response found
+	return false, fmt.Errorf("no valid user response available")
 }
 
 // ExecuteOperation simulates executing a removal operation
