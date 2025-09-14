@@ -92,7 +92,7 @@ func (h *SafetyTestHarness) RequestConfirmation(source IssueRef, targets []Issue
 
 		// Process response
 		response = strings.ToLower(strings.TrimSpace(response))
-		
+
 		// Check for valid responses
 		if response == "y" || response == "yes" {
 			return true, nil
@@ -100,7 +100,7 @@ func (h *SafetyTestHarness) RequestConfirmation(source IssueRef, targets []Issue
 		if response == "n" || response == "no" || response == "" {
 			return false, nil // Empty response defaults to "no"
 		}
-		
+
 		// Invalid response - continue to next response
 		// In a real implementation, this would prompt again
 		continue
