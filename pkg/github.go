@@ -6,7 +6,7 @@ package pkg
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -598,7 +598,7 @@ func FetchIssueDependencies(ctx context.Context, owner, repo string, issueNumber
 // getCacheKey generates a unique cache key for the request
 func getCacheKey(owner, repo string, issueNumber int) string {
 	key := fmt.Sprintf("%s/%s#%d", owner, repo, issueNumber)
-	hash := md5.Sum([]byte(key))
+	hash := sha256.Sum256([]byte(key))
 	return fmt.Sprintf("%x", hash)
 }
 
@@ -648,7 +648,7 @@ func saveToCache(key string, data *DependencyData) {
 	cacheDir := getCacheDir()
 
 	// Create cache directory if it doesn't exist
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0750); err != nil {
 		return // fail silently
 	}
 
@@ -666,7 +666,7 @@ func saveToCache(key string, data *DependencyData) {
 
 	// Write to cache file
 	cachePath := filepath.Join(cacheDir, key+".json")
-	if err := os.WriteFile(cachePath, jsonData, 0644); err != nil {
+	if err := os.WriteFile(cachePath, jsonData, 0600); err != nil {
 		// Log error but don't fail the main operation
 		fmt.Fprintf(os.Stderr, "Warning: failed to write cache file: %v\n", err)
 	}

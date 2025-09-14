@@ -281,10 +281,10 @@ main() {
     start_time=$(date +%s.%N)
     ./gh-issue-dependency --help > /dev/null
     end_time=$(date +%s.%N)
-    duration=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0.1")
+    duration=$(awk "BEGIN {print $end_time - $start_time}" 2>/dev/null || echo "0.1")
     
     # Help should be very fast (< 0.5 seconds)
-    if [ "$(echo "$duration > 0.5" | bc 2>/dev/null || echo "0")" = "1" ]; then
+    if [ "$(awk "BEGIN {print ($duration > 0.5) ? 1 : 0}" 2>/dev/null || echo "0")" = "1" ]; then
         print_status "WARN" "Help command took ${duration}s (target: < 0.5s)"
     else
         print_status "PASS" "Help command performance acceptable (${duration}s)"

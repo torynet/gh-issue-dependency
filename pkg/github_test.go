@@ -342,7 +342,7 @@ func TestGetCacheKey(t *testing.T) {
 
 			if tt.expectNonEmpty {
 				assert.NotEmpty(t, key, "cache key should not be empty")
-				assert.Equal(t, 32, len(key), "cache key should be MD5 hash length")
+				assert.Equal(t, 64, len(key), "cache key should be SHA256 hash length")
 			}
 		})
 	}

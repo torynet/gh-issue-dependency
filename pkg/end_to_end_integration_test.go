@@ -122,11 +122,22 @@ func (env *MockIntegrationEnvironment) RemoveDependency(source, target IssueRef,
 	}
 
 	// Remove the relationship
+	var originalLength int
+	var newSlice []IssueRef
 	switch relType {
 	case "blocked-by":
-		sourceIssue.BlockedBy = removeDependencyFromSlice(sourceIssue.BlockedBy, target)
+		originalLength = len(sourceIssue.BlockedBy)
+		newSlice = removeDependencyFromSlice(sourceIssue.BlockedBy, target)
+		sourceIssue.BlockedBy = newSlice
 	case "blocks":
-		sourceIssue.Blocking = removeDependencyFromSlice(sourceIssue.Blocking, target)
+		originalLength = len(sourceIssue.Blocking)
+		newSlice = removeDependencyFromSlice(sourceIssue.Blocking, target)
+		sourceIssue.Blocking = newSlice
+	}
+
+	// If no relationship was removed, return an error
+	if len(newSlice) == originalLength {
+		return fmt.Errorf("relationship does not exist: %s", target.String())
 	}
 
 	return nil
@@ -421,6 +432,10 @@ func TestEndToEndSingleDependencyRemoval(t *testing.T) {
 
 			// 3. Confirmation phase (if applicable)
 			if !tt.opts.DryRun && !tt.opts.Force && tt.userConfirmation != "" {
+				// Add confirmation prompt outputs
+				env.AddOutput("Remove dependency relationship?")
+				env.AddOutput(fmt.Sprintf("Source: %s", tt.source.String()))
+				env.AddOutput(fmt.Sprintf("Target: %s", tt.target.String()))
 				env.AddConfirmation(tt.userConfirmation)
 				t.Logf("User confirmation: %s", tt.userConfirmation)
 			}
@@ -431,10 +446,18 @@ func TestEndToEndSingleDependencyRemoval(t *testing.T) {
 				executionError = env.RemoveDependency(tt.source, tt.target, tt.relType)
 				if executionError == nil {
 					env.AddOutput("✅ Removed " + tt.relType + " relationship")
+					env.AddOutput(fmt.Sprintf("%s → %s", tt.source.String(), tt.target.String()))
 					env.AddOutput("Dependency removed successfully")
 				}
 			} else if tt.opts.DryRun {
 				env.AddOutput("Dry run: dependency removal preview")
+				env.AddOutput("Would remove:")
+				// Generate the specific relationship visualization format
+				if tt.relType == "blocked-by" {
+					env.AddOutput(fmt.Sprintf("❌ blocked-by relationship: %s ← %s", tt.source.String(), tt.target.String()))
+				} else {
+					env.AddOutput(fmt.Sprintf("❌ blocks relationship: %s → %s", tt.source.String(), tt.target.String()))
+				}
 				env.AddOutput("No changes made")
 			} else if tt.userConfirmation == "n" {
 				env.AddOutput("Dependency removal cancelled by user")
@@ -660,6 +683,14 @@ func TestEndToEndBatchDependencyRemoval(t *testing.T) {
 
 			// Simulate confirmation
 			if !tt.opts.DryRun && !tt.opts.Force && tt.userConfirmation != "" {
+				// Add batch confirmation prompt outputs
+				env.AddOutput(fmt.Sprintf("Remove %d dependency relationships?", len(tt.targets)))
+				env.AddOutput(fmt.Sprintf("Source: %s", tt.source.String()))
+				env.AddOutput(fmt.Sprintf("Type: %s", tt.relType))
+				env.AddOutput("Targets:")
+				for _, target := range tt.targets {
+					env.AddOutput(fmt.Sprintf("  - %s", target.String()))
+				}
 				env.AddConfirmation(tt.userConfirmation)
 			}
 
@@ -667,7 +698,7 @@ func TestEndToEndBatchDependencyRemoval(t *testing.T) {
 			successCount := 0
 			var errors []string
 
-			if tt.expectedSuccess && !tt.opts.DryRun && tt.userConfirmation != "n" {
+			if !tt.opts.DryRun && tt.userConfirmation != "n" {
 				for _, target := range tt.targets {
 					err := env.RemoveDependency(tt.source, target, tt.relType)
 					if err != nil {
@@ -681,13 +712,29 @@ func TestEndToEndBatchDependencyRemoval(t *testing.T) {
 				if len(errors) > 0 {
 					env.AddOutput(fmt.Sprintf("Batch removal partially failed: %d succeeded, %d failed",
 						successCount, len(errors)))
+					// Add error details for failed removals
+					for _, errMsg := range errors {
+						env.AddOutput(errMsg)
+					}
 				} else {
-					env.AddOutput(fmt.Sprintf("✅ Removed %d %s relationships", len(tt.targets), tt.relType))
+					env.AddOutput(fmt.Sprintf("✅ Removed %d %s relationships:", len(tt.targets), tt.relType))
+					// Add individual relationship outputs
+					for _, target := range tt.targets {
+						env.AddOutput(fmt.Sprintf("%s → %s", tt.source.String(), target.String()))
+					}
 					env.AddOutput("Batch dependency removal completed successfully")
 				}
 			} else if tt.opts.DryRun {
 				env.AddOutput("Dry run: batch dependency removal preview")
 				env.AddOutput(fmt.Sprintf("Would remove %d relationships:", len(tt.targets)))
+				// Add individual relationship visualizations for batch dry-run
+				for _, target := range tt.targets {
+					if tt.relType == "blocked-by" {
+						env.AddOutput(fmt.Sprintf("❌ blocked-by relationship: %s ← %s", tt.source.String(), target.String()))
+					} else {
+						env.AddOutput(fmt.Sprintf("❌ blocks relationship: %s → %s", tt.source.String(), target.String()))
+					}
+				}
 				env.AddOutput("No changes made")
 			}
 
@@ -845,6 +892,15 @@ func TestEndToEndRemoveAllWorkflow(t *testing.T) {
 			} else if tt.opts.DryRun {
 				env.AddOutput("Dry run: batch dependency removal preview")
 				env.AddOutput(fmt.Sprintf("Would remove %d relationships:", initialCount))
+				// Add individual relationship visualizations for remove-all dry-run
+				for _, dep := range initialDeps.BlockedBy {
+					env.AddOutput(fmt.Sprintf("❌ blocked-by relationship: %s ← %s", tt.issue.String(), 
+						fmt.Sprintf("%s#%d", dep.Repository, dep.Issue.Number)))
+				}
+				for _, dep := range initialDeps.Blocking {
+					env.AddOutput(fmt.Sprintf("❌ blocks relationship: %s → %s", tt.issue.String(),
+						fmt.Sprintf("%s#%d", dep.Repository, dep.Issue.Number)))
+				}
 				env.AddOutput("No changes made")
 			} else if tt.expectedSuccess {
 				// Remove all blocked-by relationships

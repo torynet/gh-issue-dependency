@@ -1,0 +1,10 @@
+# Ignore history directory that contains IDE/editor backup files
+.history/
+.history/**
+
+# Ignore test files that may have intentional vulnerabilities for testing
+*_test.go
+
+# Ignore vendor directories
+vendor/
+vendor/**
