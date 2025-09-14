@@ -894,7 +894,7 @@ func TestEndToEndRemoveAllWorkflow(t *testing.T) {
 				env.AddOutput(fmt.Sprintf("Would remove %d relationships:", initialCount))
 				// Add individual relationship visualizations for remove-all dry-run
 				for _, dep := range initialDeps.BlockedBy {
-					env.AddOutput(fmt.Sprintf("❌ blocked-by relationship: %s ← %s", tt.issue.String(), 
+					env.AddOutput(fmt.Sprintf("❌ blocked-by relationship: %s ← %s", tt.issue.String(),
 						fmt.Sprintf("%s#%d", dep.Repository, dep.Issue.Number)))
 				}
 				for _, dep := range initialDeps.Blocking {
