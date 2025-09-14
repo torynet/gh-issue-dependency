@@ -66,6 +66,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
+          cache: false
 
       # Temporarily disable cache to resolve corruption issues
       # - name: Cache Go modules
@@ -125,6 +126,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+          cache: false
 
       # Temporarily disable cache to resolve corruption issues
       # - name: Cache Go modules
@@ -158,6 +160,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+          cache: false
 
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
@@ -195,6 +198,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+          cache: false
 
       # Temporarily disable cache to resolve corruption issues
       # - name: Cache Go modules
@@ -236,6 +240,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+          cache: false
 
       - name: Check if go.mod is tidy
         run: |
@@ -258,6 +263,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+          cache: false
 
       - name: Download dependencies
         run: go mod download
@@ -285,6 +291,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+          cache: false
 
       - name: Download dependencies
         run: go mod download
