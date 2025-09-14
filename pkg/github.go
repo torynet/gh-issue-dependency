@@ -289,7 +289,10 @@ func ResolveRepository(repoFlag, issueRef string) (owner, repo string, err error
 	}
 
 	// Priority 2: Issue URL parsing (if issue is URL)
-	if strings.HasPrefix(issueRef, "https://github.com/") {
+	if strings.HasPrefix(issueRef, "https://") {
+		if !strings.HasPrefix(issueRef, "https://github.com/") {
+			return "", "", fmt.Errorf("unsupported URL: only GitHub URLs are supported, got: %s", issueRef)
+		}
 		var issueNumber int
 		owner, repo, issueNumber, err = ParseIssueURL(issueRef)
 		if err != nil {
