@@ -110,7 +110,7 @@ BREAKING CHANGE: ${BREAKING_DESC}"
           
           echo "commit_type_found=$COMMIT_TYPE" >> $GITHUB_OUTPUT
 
-      - name: Comment on PR with Squash Preview  
+      - name: Comment on PR with Squash Preview
         if: steps.conventional_commit.outputs.commit_type_found != ''
         uses: actions/github-script@v7
         with:
