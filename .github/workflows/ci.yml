@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - name: Check PR title for issue reference
+      - name: Check PR title for issue reference and conventional commit format
         run: |
           PR_TITLE="${{ github.event.pull_request.title }}"
           BRANCH_NAME="${{ github.head_ref }}"
@@ -40,15 +40,35 @@ jobs:
           # Extract issue number from branch name
           ISSUE_NUM=$(echo "$BRANCH_NAME" | sed -n 's/^[^/]*\/\([0-9]\+\)-.*/\1/p')
 
-          # Check if PR title starts with issue number
-          if [[ ! "$PR_TITLE" =~ ^${ISSUE_NUM}: ]]; then
-            echo "❌ PR title must start with issue number from branch"
-            echo "   Expected format: $ISSUE_NUM: Description"
-            echo "   Your title: $PR_TITLE"
-            exit 1
+          # Define conventional commit types
+          VALID_TYPES="feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert"
+
+          # Check for new format: {issue}: {type}: {description}
+          if [[ "$PR_TITLE" =~ ^${ISSUE_NUM}:\ (${VALID_TYPES})(!)?:\ .+ ]]; then
+            echo "✅ PR title follows conventional commit format: $PR_TITLE"
+            # Extract conventional commit type for future use
+            COMMIT_TYPE=$(echo "$PR_TITLE" | sed -E -n "s/^${ISSUE_NUM}: (${VALID_TYPES})(!)?: .*/\1/p")
+            echo "📋 Conventional commit type: $COMMIT_TYPE"
+            exit 0
           fi
 
-          echo "✅ PR title includes issue number"
+          # Check for legacy format: {issue}: {description}
+          if [[ "$PR_TITLE" =~ ^${ISSUE_NUM}:\ .+ ]]; then
+            echo "⚠️ PR title uses legacy format: $PR_TITLE"
+            echo "   Consider using new format: $ISSUE_NUM: {type}: {description}"
+            echo "   Valid types: feat, fix, docs, style, refactor, perf, test, chore, ci, build, revert"
+            echo "   Example: $ISSUE_NUM: fix: improve error handling"
+            echo "✅ Legacy format accepted during transition period"
+            exit 0
+          fi
+
+          # Neither format matches
+          echo "❌ PR title must start with issue number from branch"
+          echo "   New format (recommended): $ISSUE_NUM: {type}: {description}"
+          echo "   Legacy format (deprecated): $ISSUE_NUM: {description}"
+          echo "   Valid types: feat, fix, docs, style, refactor, perf, test, chore, ci, build, revert"
+          echo "   Your title: $PR_TITLE"
+          exit 1
 
   test:
     name: Test
