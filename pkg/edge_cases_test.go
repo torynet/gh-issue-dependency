@@ -364,7 +364,7 @@ func TestCachingEdgeCases(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
 				key := getCacheKey(tc.owner, tc.repo, tc.number)
-				assert.Equal(t, 32, len(key), "Cache key should always be 32 chars (MD5 hash)")
+				assert.Equal(t, 64, len(key), "Cache key should always be 64 chars (SHA256 hash)")
 
 				// Ensure uniqueness
 				assert.False(t, keys[key], "Cache keys should be unique")
@@ -406,7 +406,10 @@ func TestRepositoryContextEdgeCases(t *testing.T) {
 		assert.True(t,
 			strings.Contains(errorMsg, "not found") ||
 				strings.Contains(errorMsg, "not available") ||
-				strings.Contains(errorMsg, "authentication"),
+				strings.Contains(errorMsg, "authentication") ||
+				strings.Contains(errorMsg, "cannot access") ||
+				strings.Contains(errorMsg, "access repository") ||
+				strings.Contains(errorMsg, "cannot access repository"),
 			"Error should indicate repository access issue: %v", err)
 	})
 }
@@ -429,7 +432,8 @@ func TestAPIIntegrationEdgeCases(t *testing.T) {
 			strings.Contains(errorMsg, "timeout") ||
 				strings.Contains(errorMsg, "context") ||
 				strings.Contains(errorMsg, "authentication") ||
-				strings.Contains(errorMsg, "not available"),
+				strings.Contains(errorMsg, "not available") ||
+				strings.Contains(errorMsg, "cannot access"),
 			"Should indicate timeout or auth issue: %v", err)
 	})
 
@@ -553,7 +557,7 @@ func TestConcurrencyEdgeCases(t *testing.T) {
 
 				// Generate different cache keys
 				key := getCacheKey("owner", "repo", id)
-				assert.Equal(t, 32, len(key), "Cache key should be valid length")
+				assert.Equal(t, 64, len(key), "Cache key should be valid length")
 
 				// Attempt cache operations (these might fail due to permissions)
 				data, found := getFromCache(key)

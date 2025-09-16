@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -342,7 +343,7 @@ func TestGetCacheKey(t *testing.T) {
 
 			if tt.expectNonEmpty {
 				assert.NotEmpty(t, key, "cache key should not be empty")
-				assert.Equal(t, 32, len(key), "cache key should be MD5 hash length")
+				assert.Equal(t, 64, len(key), "cache key should be SHA256 hash length")
 			}
 		})
 	}
@@ -362,7 +363,7 @@ func TestCacheOperations(t *testing.T) {
 	// Create temporary cache directory for testing
 	tempDir, err := os.MkdirTemp("", "gh-issue-dependency-test-cache")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Note: we can't actually change the const CacheDir for testing
 	// In a production system, we'd make getCacheDir() configurable
@@ -412,20 +413,22 @@ func TestResolveRepository(t *testing.T) {
 		skipIfNoGH bool
 	}{
 		{
-			name:      "repo flag takes priority",
-			repoFlag:  "priority/repo",
-			issueRef:  "https://github.com/other/repo/issues/123",
-			wantOwner: "priority",
-			wantRepo:  "repo",
-			wantErr:   false,
+			name:       "repo flag takes priority",
+			repoFlag:   "priority/repo",
+			issueRef:   "https://github.com/other/repo/issues/123",
+			wantOwner:  "priority",
+			wantRepo:   "repo",
+			wantErr:    false,
+			skipIfNoGH: true, // Skip if gh CLI not available or not authenticated
 		},
 		{
-			name:      "issue URL parsing when no repo flag",
-			repoFlag:  "",
-			issueRef:  "https://github.com/from-url/repo/issues/456",
-			wantOwner: "from-url",
-			wantRepo:  "repo",
-			wantErr:   false,
+			name:       "issue URL parsing when no repo flag",
+			repoFlag:   "",
+			issueRef:   "https://github.com/from-url/repo/issues/456",
+			wantOwner:  "from-url",
+			wantRepo:   "repo",
+			wantErr:    false,
+			skipIfNoGH: true, // Skip if gh CLI not available or not authenticated
 		},
 		{
 			name:       "current repo detection when no URL",
@@ -459,6 +462,12 @@ func TestResolveRepository(t *testing.T) {
 			}
 
 			owner, repo, err := ResolveRepository(tt.repoFlag, tt.issueRef)
+
+			// Handle authentication/permission errors in CI environments
+			if tt.skipIfNoGH && err != nil && (isAuthError(err) || strings.Contains(err.Error(), "Cannot access repository")) {
+				t.Skipf("Skipping test due to repository access error in CI: %v", err)
+				return
+			}
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ResolveRepository() error = %v, wantErr %v", err, tt.wantErr)
@@ -591,7 +600,7 @@ func TestDataStructures(t *testing.T) {
 		assert.Equal(t, 123, data.SourceIssue.Number)
 		assert.Equal(t, "Test Issue", data.SourceIssue.Title)
 		assert.Equal(t, "open", data.SourceIssue.State)
-		assert.Equal(t, "test/repo", data.SourceIssue.Repository)
+		assert.Equal(t, "test/repo", data.SourceIssue.Repository.FullName)
 		assert.Len(t, data.SourceIssue.Assignees, 1)
 		assert.Equal(t, "testuser", data.SourceIssue.Assignees[0].Login)
 		assert.Len(t, data.SourceIssue.Labels, 1)

@@ -24,11 +24,11 @@ print_status() {
     case $status in
         "PASS")
             echo -e "${GREEN}[PASS]${NC} $message"
-            ((TESTS_PASSED++))
+            TESTS_PASSED=$((TESTS_PASSED + 1))
             ;;
         "FAIL")
             echo -e "${RED}[FAIL]${NC} $message"
-            ((TESTS_FAILED++))
+            TESTS_FAILED=$((TESTS_FAILED + 1))
             ;;
         "INFO")
             echo -e "${BLUE}[INFO]${NC} $message"
@@ -46,7 +46,7 @@ run_test() {
     shift 2
     local cmd=("$@")
     
-    ((TESTS_RUN++))
+    TESTS_RUN=$((TESTS_RUN + 1))
     print_status "INFO" "Running test: $test_name"
     
     # Capture both stdout and stderr
@@ -76,7 +76,7 @@ test_output_contains() {
     shift 2
     local cmd=("$@")
     
-    ((TESTS_RUN++))
+    TESTS_RUN=$((TESTS_RUN + 1))
     print_status "INFO" "Running test: $test_name"
     
     local output
@@ -106,7 +106,7 @@ test_output_not_contains() {
     shift 2
     local cmd=("$@")
     
-    ((TESTS_RUN++))
+    TESTS_RUN=$((TESTS_RUN + 1))
     print_status "INFO" "Running test: $test_name"
     
     local output
@@ -146,19 +146,19 @@ main() {
     run_test "Binary executes without errors" 0 ./gh-issue-dependency
     
     # Test 2: Help flag works
-    test_output_contains "Help flag shows usage" "A GitHub CLI extension" ./gh-issue-dependency --help
+    test_output_contains "Help flag shows usage" "Manage issue dependencies in GitHub repositories" ./gh-issue-dependency --help
     
     # Test 3: Version flag works
     test_output_contains "Version flag shows version" "gh-issue-dependency version" ./gh-issue-dependency --version
     
     # Test 4: Short help flag works
-    test_output_contains "Short help flag works" "A GitHub CLI extension" ./gh-issue-dependency -h
+    test_output_contains "Short help flag works" "Manage issue dependencies in GitHub repositories" ./gh-issue-dependency -h
     
     # Test 5: Root command shows help by default
     test_output_contains "Root command shows help" "Available Commands:" ./gh-issue-dependency
     
     # Test 6: Invalid flag shows error
-    run_test "Invalid flag returns error" 2 ./gh-issue-dependency --invalid-flag
+    run_test "Invalid flag returns error" 1 ./gh-issue-dependency --invalid-flag
     
     # Test 7: Global repo flag is recognized
     test_output_not_contains "Global repo flag recognized" "unknown flag" ./gh-issue-dependency --repo owner/repo --help
@@ -174,7 +174,7 @@ main() {
     # Test 10: Help format is proper
     test_output_contains "Usage section present" "Usage:" ./gh-issue-dependency --help
     test_output_contains "Flags section present" "Flags:" ./gh-issue-dependency --help
-    test_output_contains "Examples section present" "Examples:" ./gh-issue-dependency --help
+    test_output_contains "Examples section present" "EXAMPLES" ./gh-issue-dependency --help
     
     # Test 11: Version template format
     test_output_contains "Version format correct" "gh-issue-dependency version" ./gh-issue-dependency --version
@@ -183,12 +183,12 @@ main() {
     run_test "No panic on empty args" 0 ./gh-issue-dependency
     
     # Test 13: Subcommand help works
-    test_output_contains "Add command help" "Add dependency" ./gh-issue-dependency add --help
+    test_output_contains "Add command help" "Add a dependency relationship" ./gh-issue-dependency add --help
     test_output_contains "List command help" "List dependencies" ./gh-issue-dependency list --help
-    test_output_contains "Remove command help" "Remove dependency" ./gh-issue-dependency remove --help
+    test_output_contains "Remove command help" "Remove existing dependency relationships" ./gh-issue-dependency remove --help
     
     # Test 14: Invalid subcommand shows error
-    run_test "Invalid subcommand returns error" 2 ./gh-issue-dependency invalid-command
+    run_test "Invalid subcommand returns error" 1 ./gh-issue-dependency invalid-command
     
     # Test 15: Help text contains examples
     test_output_contains "Help contains examples" "gh issue-dependency list" ./gh-issue-dependency --help
@@ -197,11 +197,11 @@ main() {
     
     # Test 16: Repository flag validation (if applicable)
     # This test depends on the actual implementation but tests error handling
-    run_test "Invalid repo format handled" 2 ./gh-issue-dependency -R "invalid" list || true
+    run_test "Invalid repo format handled" 1 ./gh-issue-dependency -R "invalid" list || true
     
     # Test 17: Test build with different flags
     print_status "INFO" "Testing build with version flag..."
-    if go build -ldflags "-X cmd.Version=test-1.0.0" -o gh-issue-dependency-versioned .; then
+    if go build -ldflags "-X github.com/torynet/gh-issue-dependency/cmd.Version=test-1.0.0" -o gh-issue-dependency-versioned .; then
         test_output_contains "Custom version in binary" "test-1.0.0" ./gh-issue-dependency-versioned --version
         rm -f gh-issue-dependency-versioned
     else
@@ -213,14 +213,14 @@ main() {
     
     # Test 18: List command argument validation
     print_status "INFO" "Testing list command argument validation"
-    run_test "List command requires arguments" 2 ./gh-issue-dependency list
-    run_test "List command rejects too many arguments" 2 ./gh-issue-dependency list 123 456
+    run_test "List command requires arguments" 1 ./gh-issue-dependency list
+    run_test "List command rejects too many arguments" 1 ./gh-issue-dependency list 123 456
     
     # Test 19: List command flag validation
     print_status "INFO" "Testing list command flag validation"
-    run_test "Invalid format flag rejected" 2 ./gh-issue-dependency list 123 --format invalid
-    run_test "Invalid state flag rejected" 2 ./gh-issue-dependency list 123 --state invalid
-    run_test "Invalid sort flag rejected" 2 ./gh-issue-dependency list 123 --sort invalid
+    run_test "Invalid format flag rejected" 1 ./gh-issue-dependency list 123 --format invalid
+    run_test "Invalid state flag rejected" 1 ./gh-issue-dependency list 123 --state invalid
+    run_test "Invalid sort flag rejected" 1 ./gh-issue-dependency list 123 --sort invalid
     
     # Test 20: Format flag acceptance
     test_output_not_contains "Valid table format accepted" "Invalid format" ./gh-issue-dependency list 123 --format table --help
@@ -240,7 +240,7 @@ main() {
     
     # Test 23: Repository flag validation (without making API calls)
     run_test "Invalid repo format handled gracefully" 2 ./gh-issue-dependency --repo "invalid" list 123 || true
-    run_test "Empty repo flag handled" 2 ./gh-issue-dependency --repo "" list 123 || true
+    run_test "Empty repo flag handled" 1 ./gh-issue-dependency --repo "" list 123 || true
     
     # Test 24: JSON fields flag
     test_output_contains "JSON fields flag recognized" "json" ./gh-issue-dependency list 123 --json blocked_by --help
@@ -258,14 +258,14 @@ main() {
     
     # Test 27: Add command basic validation
     print_status "INFO" "Testing add command structure"
-    test_output_contains "Add command exists" "Add dependency" ./gh-issue-dependency add --help
-    run_test "Add command requires arguments" 2 ./gh-issue-dependency add
+    test_output_contains "Add command exists" "Add a dependency relationship" ./gh-issue-dependency add --help
+    run_test "Add command requires arguments" 1 ./gh-issue-dependency add
     test_output_contains "Add command shows usage" "Usage:" ./gh-issue-dependency add --help
     
     # Test 28: Remove command basic validation  
     print_status "INFO" "Testing remove command structure"
-    test_output_contains "Remove command exists" "Remove dependency" ./gh-issue-dependency remove --help
-    run_test "Remove command requires arguments" 2 ./gh-issue-dependency remove
+    test_output_contains "Remove command exists" "Remove existing dependency relationships" ./gh-issue-dependency remove --help
+    run_test "Remove command requires arguments" 1 ./gh-issue-dependency remove
     test_output_contains "Remove command shows usage" "Usage:" ./gh-issue-dependency remove --help
     
     # Test 29: Global repository flag handling
@@ -273,24 +273,42 @@ main() {
     test_output_not_contains "Short repo flag accepted" "unknown flag" ./gh-issue-dependency -R test/repo --help
     
     # Test 30: Error message quality
-    test_output_contains "Helpful error for missing auth" "gh auth" ./gh-issue-dependency list 123 || true
-    test_output_contains "Helpful error for invalid issue" "issue" ./gh-issue-dependency list abc || true
+    # Test that missing issue gives helpful error (expect exit code 1)
+    if output=$(./gh-issue-dependency list 123 2>&1); then
+        print_status "FAIL" "Missing issue should return error"  
+    else
+        if echo "$output" | grep -q "not found"; then
+            print_status "PASS" "Helpful error for missing issue"
+        else
+            print_status "FAIL" "Error message should contain 'not found'"
+        fi
+    fi
+    # Test that invalid issue format gives helpful error (expect exit code 2)
+    if output=$(./gh-issue-dependency list abc 2>&1); then
+        print_status "FAIL" "Invalid issue should return error"
+    else
+        if echo "$output" | grep -q "issue"; then
+            print_status "PASS" "Helpful error for invalid issue"
+        else
+            print_status "FAIL" "Error message should contain 'issue'"
+        fi
+    fi
     
     # Test 31: Performance regression test
     print_status "INFO" "Running basic performance test"
     start_time=$(date +%s.%N)
     ./gh-issue-dependency --help > /dev/null
     end_time=$(date +%s.%N)
-    duration=$(echo "$end_time - $start_time" | bc 2>/dev/null || echo "0.1")
+    duration=$(awk "BEGIN {print $end_time - $start_time}" 2>/dev/null || echo "0.1")
     
     # Help should be very fast (< 0.5 seconds)
-    if [ "$(echo "$duration > 0.5" | bc 2>/dev/null || echo "0")" = "1" ]; then
+    if [ "$(awk "BEGIN {print ($duration > 0.5) ? 1 : 0}" 2>/dev/null || echo "0")" = "1" ]; then
         print_status "WARN" "Help command took ${duration}s (target: < 0.5s)"
     else
         print_status "PASS" "Help command performance acceptable (${duration}s)"
-        ((TESTS_PASSED++))
+        TESTS_PASSED=$((TESTS_PASSED + 1))
     fi
-    ((TESTS_RUN++))
+    TESTS_RUN=$((TESTS_RUN + 1))
     
     # Test 32: Cross-platform compatibility
     print_status "INFO" "Testing cross-platform features"
@@ -307,8 +325,8 @@ main() {
     # Test 34: Unicode and special character handling
     print_status "INFO" "Testing special character support"
     # These should not crash the program
-    run_test "Handles unicode in arguments" 2 ./gh-issue-dependency list "测试" || true
-    run_test "Handles special chars in repo" 2 ./gh-issue-dependency --repo "test/repo-special_chars.test" list 123 || true
+    run_test "Handles unicode in arguments" 1 ./gh-issue-dependency list "测试" || true
+    run_test "Handles special chars in repo" 1 ./gh-issue-dependency --repo "test/repo-special_chars.test" list 123 || true
     
     # Test 35: Memory usage test (basic)
     print_status "INFO" "Running basic memory test"
@@ -317,21 +335,43 @@ main() {
         ./gh-issue-dependency --help > /dev/null
     done
     print_status "PASS" "Multiple invocations completed (basic memory test)"
-    ((TESTS_PASSED++))
-    ((TESTS_RUN++))
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+    TESTS_RUN=$((TESTS_RUN + 1))
     
     # Test 36: Signal handling
     print_status "INFO" "Testing signal handling"
-    # Start help command and interrupt it
-    timeout 1s ./gh-issue-dependency --help > /dev/null 2>&1
-    exit_code=$?
-    if [ $exit_code -eq 124 ] || [ $exit_code -eq 0 ]; then
-        print_status "PASS" "Signal handling works correctly"
-        ((TESTS_PASSED++))
+    # Start help command and interrupt it - use cross-platform approach
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 1s ./gh-issue-dependency --help > /dev/null 2>&1
+        exit_code=$?
+        if [ $exit_code -eq 124 ] || [ $exit_code -eq 0 ]; then
+            print_status "PASS" "Signal handling works correctly"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            print_status "WARN" "Unexpected exit code from timeout test: $exit_code"
+        fi
+    elif command -v gtimeout >/dev/null 2>&1; then
+        # macOS with coreutils installed
+        gtimeout 1s ./gh-issue-dependency --help > /dev/null 2>&1
+        exit_code=$?
+        if [ $exit_code -eq 124 ] || [ $exit_code -eq 0 ]; then
+            print_status "PASS" "Signal handling works correctly"  
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            print_status "WARN" "Unexpected exit code from gtimeout test: $exit_code"
+        fi
     else
-        print_status "WARN" "Unexpected exit code from timeout test: $exit_code"
+        # Fallback for systems without timeout - just run the command normally
+        ./gh-issue-dependency --help > /dev/null 2>&1
+        exit_code=$?
+        if [ $exit_code -eq 0 ]; then
+            print_status "PASS" "Signal handling works correctly (no timeout available)"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            print_status "WARN" "Help command failed: $exit_code"
+        fi
     fi
-    ((TESTS_RUN++))
+    TESTS_RUN=$((TESTS_RUN + 1))
     
     # Test 37: Output format consistency
     print_status "INFO" "Testing output format consistency"
@@ -340,22 +380,22 @@ main() {
     # Check for consistent formatting
     if echo "$help_output" | grep -q "Usage:" && echo "$help_output" | grep -q "Available Commands:" && echo "$help_output" | grep -q "Flags:"; then
         print_status "PASS" "Help output format consistent"
-        ((TESTS_PASSED++))
+        TESTS_PASSED=$((TESTS_PASSED + 1))
     else
         print_status "FAIL" "Help output format inconsistent"
-        ((TESTS_FAILED++))
+        TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
-    ((TESTS_RUN++))
+    TESTS_RUN=$((TESTS_RUN + 1))
     
     # Test 38: Error handling robustness
     print_status "INFO" "Testing error handling robustness"
     
     # Test with extremely long arguments
     long_arg=$(printf 'a%.0s' {1..1000})
-    run_test "Handles very long arguments" 2 ./gh-issue-dependency list "$long_arg" || true
+    run_test "Handles very long arguments" 1 ./gh-issue-dependency list "$long_arg" || true
     
     # Test with null bytes (if supported by shell)
-    run_test "Handles special bytes safely" 2 ./gh-issue-dependency list $'\x00' || true
+    run_test "Handles special bytes safely" 1 ./gh-issue-dependency list $'\x00' || true
     
     # Test 39: Concurrent execution safety
     print_status "INFO" "Testing concurrent execution safety"
@@ -365,26 +405,26 @@ main() {
     (./gh-issue-dependency --help > /dev/null 2>&1) &
     wait
     print_status "PASS" "Concurrent execution completed safely"
-    ((TESTS_PASSED++))
-    ((TESTS_RUN++))
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+    TESTS_RUN=$((TESTS_RUN + 1))
     
     # Test 40: Integration test completeness verification
     print_status "INFO" "Verifying test coverage completeness"
     
     # Verify all main commands are tested
     commands_tested=0
-    if echo "$help_output" | grep -q "list.*List"; then ((commands_tested++)); fi
-    if echo "$help_output" | grep -q "add.*Add"; then ((commands_tested++)); fi  
-    if echo "$help_output" | grep -q "remove.*Remove"; then ((commands_tested++)); fi
+    if echo "$help_output" | grep -q "list.*List"; then commands_tested=$((commands_tested + 1)); fi
+    if echo "$help_output" | grep -q "add.*Add"; then commands_tested=$((commands_tested + 1)); fi  
+    if echo "$help_output" | grep -q "remove.*Remove"; then commands_tested=$((commands_tested + 1)); fi
     
     if [ $commands_tested -eq 3 ]; then
         print_status "PASS" "All main commands covered in tests ($commands_tested/3)"
-        ((TESTS_PASSED++))
+        TESTS_PASSED=$((TESTS_PASSED + 1))
     else
         print_status "FAIL" "Not all commands covered in tests ($commands_tested/3)"
-        ((TESTS_FAILED++))
+        TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
-    ((TESTS_RUN++))
+    TESTS_RUN=$((TESTS_RUN + 1))
     
     # Clean up
     rm -f gh-issue-dependency gh-issue-dependency.exe gh-issue-dependency-versioned

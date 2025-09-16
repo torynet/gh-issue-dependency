@@ -6,7 +6,7 @@ package pkg
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -221,8 +221,12 @@ func ValidateRepoAccess(owner, repo string) error {
 	}
 
 	// Use gh CLI to check repository access
+	// Validate repository name format to prevent command injection
 	repoName := fmt.Sprintf("%s/%s", owner, repo)
-	cmd := exec.Command("gh", "repo", "view", repoName, "--json", "id")
+	if !regexp.MustCompile(`^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$`).MatchString(repoName) {
+		return fmt.Errorf("invalid repository name format: %s", repoName)
+	}
+	cmd := exec.Command("gh", "repo", "view", repoName, "--json", "id") // #nosec G204 -- repoName validated with strict regex
 	output, err := cmd.Output()
 	if err != nil {
 		if isGhNotFound(err) {
@@ -285,7 +289,10 @@ func ResolveRepository(repoFlag, issueRef string) (owner, repo string, err error
 	}
 
 	// Priority 2: Issue URL parsing (if issue is URL)
-	if strings.HasPrefix(issueRef, "https://github.com/") {
+	if strings.HasPrefix(issueRef, "https://") {
+		if !strings.HasPrefix(issueRef, "https://github.com/") {
+			return "", "", fmt.Errorf("unsupported URL: only GitHub URLs are supported, got: %s", issueRef)
+		}
 		var issueNumber int
 		owner, repo, issueNumber, err = ParseIssueURL(issueRef)
 		if err != nil {
@@ -598,7 +605,7 @@ func FetchIssueDependencies(ctx context.Context, owner, repo string, issueNumber
 // getCacheKey generates a unique cache key for the request
 func getCacheKey(owner, repo string, issueNumber int) string {
 	key := fmt.Sprintf("%s/%s#%d", owner, repo, issueNumber)
-	hash := md5.Sum([]byte(key))
+	hash := sha256.Sum256([]byte(key))
 	return fmt.Sprintf("%x", hash)
 }
 
@@ -616,13 +623,18 @@ func getFromCache(key string) (*DependencyData, bool) {
 	cacheDir := getCacheDir()
 	cachePath := filepath.Join(cacheDir, key+".json")
 
+	// Validate path to prevent directory traversal
+	if !strings.HasPrefix(cachePath, cacheDir) {
+		return nil, false
+	}
+
 	// Check if cache file exists
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		return nil, false
 	}
 
 	// Read cache file
-	data, err := os.ReadFile(cachePath)
+	data, err := os.ReadFile(cachePath) // #nosec G304 -- cachePath validated against directory traversal
 	if err != nil {
 		return nil, false
 	}
@@ -636,7 +648,7 @@ func getFromCache(key string) (*DependencyData, bool) {
 	// Check if cache entry has expired
 	if time.Now().After(entry.ExpiresAt) {
 		// Remove expired cache file
-		os.Remove(cachePath)
+		_ = os.Remove(cachePath) // Ignore cleanup errors
 		return nil, false
 	}
 
@@ -648,7 +660,7 @@ func saveToCache(key string, data *DependencyData) {
 	cacheDir := getCacheDir()
 
 	// Create cache directory if it doesn't exist
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0750); err != nil {
 		return // fail silently
 	}
 
@@ -666,7 +678,10 @@ func saveToCache(key string, data *DependencyData) {
 
 	// Write to cache file
 	cachePath := filepath.Join(cacheDir, key+".json")
-	os.WriteFile(cachePath, jsonData, 0644)
+	if err := os.WriteFile(cachePath, jsonData, 0600); err != nil {
+		// Log error but don't fail the main operation
+		fmt.Fprintf(os.Stderr, "Warning: failed to write cache file: %v\n", err)
+	}
 }
 
 // CleanExpiredCache removes expired cache entries
@@ -692,8 +707,13 @@ func CleanExpiredCache() error {
 
 		cachePath := filepath.Join(cacheDir, file.Name())
 
+		// Validate path to prevent directory traversal
+		if !strings.HasPrefix(cachePath, cacheDir) {
+			continue
+		}
+
 		// Read cache file
-		data, err := os.ReadFile(cachePath)
+		data, err := os.ReadFile(cachePath) // #nosec G304 -- cachePath validated against directory traversal
 		if err != nil {
 			continue
 		}
@@ -702,13 +722,13 @@ func CleanExpiredCache() error {
 		var entry CacheEntry
 		if err := json.Unmarshal(data, &entry); err != nil {
 			// Remove malformed cache files
-			os.Remove(cachePath)
+			_ = os.Remove(cachePath) // Ignore cleanup errors
 			continue
 		}
 
 		// Remove expired entries
 		if now.After(entry.ExpiresAt) {
-			os.Remove(cachePath)
+			_ = os.Remove(cachePath) // Ignore cleanup errors
 		}
 	}
 
@@ -1097,9 +1117,12 @@ func (r *DependencyRemover) requestConfirmation(source, target IssueRef, relType
 	fmt.Printf("Continue? (y/N): ")
 
 	var response string
-	fmt.Scanln(&response)
-
-	response = strings.ToLower(strings.TrimSpace(response))
+	if _, err := fmt.Scanln(&response); err != nil {
+		// Default to "no" on input error for safety
+		response = "n"
+	} else {
+		response = strings.ToLower(strings.TrimSpace(response))
+	}
 	return response == "y" || response == "yes", nil
 }
 
@@ -1109,9 +1132,12 @@ func (r *DependencyRemover) requestBasicConfirmation(source, target IssueRef, re
 	fmt.Printf("Continue? (y/N): ")
 
 	var response string
-	fmt.Scanln(&response)
-
-	response = strings.ToLower(strings.TrimSpace(response))
+	if _, err := fmt.Scanln(&response); err != nil {
+		// Default to "no" on input error for safety
+		response = "n"
+	} else {
+		response = strings.ToLower(strings.TrimSpace(response))
+	}
 	return response == "y" || response == "yes", nil
 }
 
@@ -1130,9 +1156,12 @@ func (r *DependencyRemover) requestBatchConfirmation(source IssueRef, targets []
 	fmt.Printf("Continue? (y/N): ")
 
 	var response string
-	fmt.Scanln(&response)
-
-	response = strings.ToLower(strings.TrimSpace(response))
+	if _, err := fmt.Scanln(&response); err != nil {
+		// Default to "no" on input error for safety
+		response = "n"
+	} else {
+		response = strings.ToLower(strings.TrimSpace(response))
+	}
 	return response == "y" || response == "yes", nil
 }
 
