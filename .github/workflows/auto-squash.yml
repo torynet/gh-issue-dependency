@@ -21,7 +21,6 @@ jobs:
         id: pr_info
         run: |
           PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_BODY="${{ github.event.pull_request.body }}"
           BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
           
           echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
@@ -35,8 +34,9 @@ jobs:
 
       - name: Analyze PR for Conventional Commit Type
         id: commit_type
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          PR_BODY="${{ github.event.pull_request.body }}"
           
           # Initialize variables
           COMMIT_TYPE=""
