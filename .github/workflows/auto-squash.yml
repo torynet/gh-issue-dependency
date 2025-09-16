@@ -99,9 +99,7 @@ jobs:
           
           # Add breaking change footer if needed
           if [ "$IS_BREAKING" = "true" ] && [ ! -z "$BREAKING_DESC" ]; then
-            CONVENTIONAL_MSG="${CONVENTIONAL_MSG}
-
-BREAKING CHANGE: ${BREAKING_DESC}"
+            CONVENTIONAL_MSG="${CONVENTIONAL_MSG}\n\nBREAKING CHANGE: ${BREAKING_DESC}"
           fi
           
           echo "conventional_message<<EOF" >> $GITHUB_OUTPUT
@@ -131,20 +129,13 @@ BREAKING CHANGE: ${BREAKING_DESC}"
               versionImpact = '⚫ **No version bump** (internal change)';
             }
             
-            const comment = `## 🤖 Conventional Commit Preview
-            
-When this PR is squash merged, it will create the following conventional commit:
-
-\`\`\`
-${conventionalMessage}
-\`\`\`
-
-**Version Impact:** ${versionImpact}
-
-This will ${commitType === 'feat' || commitType === 'fix' || commitType === 'perf' || isBreaking ? 'trigger an RC build' : 'not trigger a release'} after merge to main.
-
----
-*This comment is automatically generated based on the PR template selections.*`;
+            const comment = "## 🤖 Conventional Commit Preview\\n\\n" +
+              "When this PR is squash merged, it will create the following conventional commit:\\n\\n" +
+              "```\\n" + conventionalMessage + "\\n```\\n\\n" +
+              "**Version Impact:** " + versionImpact + "\\n\\n" +
+              "This will " + (commitType === 'feat' || commitType === 'fix' || commitType === 'perf' || isBreaking ? 'trigger an RC build' : 'not trigger a release') + " after merge to main.\\n\\n" +
+              "---\\n" +
+              "*This comment is automatically generated based on the PR template selections.*";
 
             // Check if we already commented
             const { data: comments } = await github.rest.issues.listComments({
@@ -179,16 +170,13 @@ This will ${commitType === 'feat' || commitType === 'fix' || commitType === 'per
         uses: actions/github-script@v7
         with:
           script: |
-            const comment = `## ⚠️ PR Template Not Completed
-            
-Please complete the PR template by checking the appropriate boxes for:
-- Type of Change (🐛 Bug fix, ✨ New feature, etc.)
-- Breaking Changes (if applicable)
-
-This ensures the squash merge creates a proper conventional commit message for automated versioning.
-
----
-*Complete the template and I'll show you the conventional commit preview.*`;
+            const comment = "## ⚠️ PR Template Not Completed\\n\\n" +
+              "Please complete the PR template by checking the appropriate boxes for:\\n" +
+              "- Type of Change (🐛 Bug fix, ✨ New feature, etc.)\\n" +
+              "- Breaking Changes (if applicable)\\n\\n" +
+              "This ensures the squash merge creates a proper conventional commit message for automated versioning.\\n\\n" +
+              "---\\n" +
+              "*Complete the template and I'll show you the conventional commit preview.*";
 
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
