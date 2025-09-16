@@ -99,9 +99,7 @@ jobs:
           
           # Add breaking change footer if needed
           if [ "$IS_BREAKING" = "true" ] && [ ! -z "$BREAKING_DESC" ]; then
-            CONVENTIONAL_MSG="${CONVENTIONAL_MSG}
-
-BREAKING CHANGE: ${BREAKING_DESC}"
+            CONVENTIONAL_MSG=$(printf "%s\n\nBREAKING CHANGE: %s" "$CONVENTIONAL_MSG" "$BREAKING_DESC")
           fi
           
           echo "conventional_message<<EOF" >> $GITHUB_OUTPUT
