@@ -340,14 +340,36 @@ main() {
     
     # Test 36: Signal handling
     print_status "INFO" "Testing signal handling"
-    # Start help command and interrupt it
-    timeout 1s ./gh-issue-dependency --help > /dev/null 2>&1
-    exit_code=$?
-    if [ $exit_code -eq 124 ] || [ $exit_code -eq 0 ]; then
-        print_status "PASS" "Signal handling works correctly"
-        TESTS_PASSED=$((TESTS_PASSED + 1))
+    # Start help command and interrupt it - use cross-platform approach
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 1s ./gh-issue-dependency --help > /dev/null 2>&1
+        exit_code=$?
+        if [ $exit_code -eq 124 ] || [ $exit_code -eq 0 ]; then
+            print_status "PASS" "Signal handling works correctly"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            print_status "WARN" "Unexpected exit code from timeout test: $exit_code"
+        fi
+    elif command -v gtimeout >/dev/null 2>&1; then
+        # macOS with coreutils installed
+        gtimeout 1s ./gh-issue-dependency --help > /dev/null 2>&1
+        exit_code=$?
+        if [ $exit_code -eq 124 ] || [ $exit_code -eq 0 ]; then
+            print_status "PASS" "Signal handling works correctly"  
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            print_status "WARN" "Unexpected exit code from gtimeout test: $exit_code"
+        fi
     else
-        print_status "WARN" "Unexpected exit code from timeout test: $exit_code"
+        # Fallback for systems without timeout - just run the command normally
+        ./gh-issue-dependency --help > /dev/null 2>&1
+        exit_code=$?
+        if [ $exit_code -eq 0 ]; then
+            print_status "PASS" "Signal handling works correctly (no timeout available)"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            print_status "WARN" "Help command failed: $exit_code"
+        fi
     fi
     TESTS_RUN=$((TESTS_RUN + 1))
     
