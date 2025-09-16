@@ -47,7 +47,7 @@ jobs:
           if [[ "$PR_TITLE" =~ ^${ISSUE_NUM}:\ (${VALID_TYPES})(!)?:\ .+ ]]; then
             echo "✅ PR title follows conventional commit format: $PR_TITLE"
             # Extract conventional commit type for future use
-            COMMIT_TYPE=$(echo "$PR_TITLE" | sed -n "s/^${ISSUE_NUM}: \(${VALID_TYPES}\)\(!\\)\\?: .*/\\1/p")
+            COMMIT_TYPE=$(echo "$PR_TITLE" | sed -E -n "s/^${ISSUE_NUM}: (${VALID_TYPES})(!)?: .*/\1/p")
             echo "📋 Conventional commit type: $COMMIT_TYPE"
             exit 0
           fi
