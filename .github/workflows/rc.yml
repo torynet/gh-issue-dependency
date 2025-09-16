@@ -51,27 +51,71 @@ jobs:
           # Check if this is a conventional commit that should trigger release
           SHOULD_RELEASE="false"
           BUMP_TYPE=""
+          CONVENTIONAL_TYPE=""
           
-          # Check for breaking changes
-          if [[ "$COMMIT_SUBJECT" =~ ^feat! ]] || [[ "$COMMIT_SUBJECT" =~ ^fix! ]] || [[ "$COMMIT_SUBJECT" =~ ^perf! ]] || [[ "$COMMIT_BODY" == *"BREAKING CHANGE"* ]]; then
+          # Extract conventional commit type from new format: {issue}: {type}: {description}
+          if [[ "$COMMIT_SUBJECT" =~ ^[0-9]+:\ (feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?:\ .+ ]]; then
+            # Extract the type (with potential ! for breaking change)
+            CONVENTIONAL_TYPE=$(echo "$COMMIT_SUBJECT" | sed -n 's/^[0-9]\+: \([a-z]\+\)\(!\\)\?: .*/\1\2/p')
+            echo "🔍 Extracted conventional type from new format: $CONVENTIONAL_TYPE"
+            
+          # Check for standard conventional commit format: {type}: {description}
+          elif [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?:\ .+ ]] || [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?(\(.+\))?:\ .+ ]]; then
+            # Extract the type (with potential ! for breaking change)
+            CONVENTIONAL_TYPE=$(echo "$COMMIT_SUBJECT" | sed -n 's/^\([a-z]\+\)\(!\\)\?\((.*)\\)\?: .*/\1\2/p')
+            echo "🔍 Extracted conventional type from standard format: $CONVENTIONAL_TYPE"
+            
+          # Legacy format without conventional commit type - no release
+          else
+            echo "ℹ️ Commit does not follow conventional commit format for releases: $COMMIT_SUBJECT"
+            echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Determine release type based on conventional commit type
+          case "$CONVENTIONAL_TYPE" in
+            *!)
+              # Breaking change (any type with !)
+              SHOULD_RELEASE="true"
+              BUMP_TYPE="major"
+              ;;
+            feat)
+              # New feature
+              SHOULD_RELEASE="true"
+              BUMP_TYPE="minor"
+              ;;
+            fix|perf)
+              # Bug fix or performance improvement
+              SHOULD_RELEASE="true"
+              BUMP_TYPE="patch"
+              ;;
+            docs|style|refactor|test|chore|ci|build|revert)
+              # Non-release types
+              SHOULD_RELEASE="false"
+              echo "ℹ️ Commit type '$CONVENTIONAL_TYPE' does not trigger releases"
+              ;;
+            *)
+              # Unknown type
+              SHOULD_RELEASE="false"
+              echo "⚠️ Unknown conventional commit type: $CONVENTIONAL_TYPE"
+              ;;
+          esac
+          
+          # Check for breaking changes in commit body
+          if [[ "$COMMIT_BODY" == *"BREAKING CHANGE"* ]]; then
             SHOULD_RELEASE="true"
             BUMP_TYPE="major"
-          # Check for new features
-          elif [[ "$COMMIT_SUBJECT" =~ ^feat: ]] || [[ "$COMMIT_SUBJECT" =~ ^feat\( ]]; then
-            SHOULD_RELEASE="true"
-            BUMP_TYPE="minor"
-          # Check for fixes and performance improvements
-          elif [[ "$COMMIT_SUBJECT" =~ ^fix: ]] || [[ "$COMMIT_SUBJECT" =~ ^fix\( ]] || [[ "$COMMIT_SUBJECT" =~ ^perf: ]] || [[ "$COMMIT_SUBJECT" =~ ^perf\( ]]; then
-            SHOULD_RELEASE="true"
-            BUMP_TYPE="patch"
+            echo "🚨 Breaking change detected in commit body"
           fi
           
           echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+          echo "conventional_type=$CONVENTIONAL_TYPE" >> $GITHUB_OUTPUT
+          
           if [ "$SHOULD_RELEASE" = "true" ]; then
             echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
-            echo "✅ Conventional commit detected: $COMMIT_SUBJECT (bump: $BUMP_TYPE)"
+            echo "✅ Conventional commit detected: $COMMIT_SUBJECT (type: $CONVENTIONAL_TYPE, bump: $BUMP_TYPE)"
           else
-            echo "ℹ️ Commit does not follow conventional commit format for releases: $COMMIT_SUBJECT"
+            echo "ℹ️ Commit does not trigger release: $COMMIT_SUBJECT (type: $CONVENTIONAL_TYPE)"
           fi
 
       - name: Calculate next version
@@ -97,18 +141,43 @@ jobs:
           # Analyze all commits since last release to find highest bump type needed
           HIGHEST_BUMP="none"
           while IFS= read -r commit_msg; do
-            if [[ "$commit_msg" =~ ^feat! ]] || [[ "$commit_msg" =~ ^fix! ]] || [[ "$commit_msg" =~ ^perf! ]] || [[ "$commit_msg" == *"BREAKING CHANGE"* ]]; then
+            # Check for breaking changes (any format)
+            if [[ "$commit_msg" == *"BREAKING CHANGE"* ]]; then
               HIGHEST_BUMP="major"
               break  # Major is highest, no need to continue
-            elif [[ "$commit_msg" =~ ^feat: ]] || [[ "$commit_msg" =~ ^feat\( ]]; then
-              if [ "$HIGHEST_BUMP" != "major" ]; then
-                HIGHEST_BUMP="minor"
-              fi
-            elif [[ "$commit_msg" =~ ^fix: ]] || [[ "$commit_msg" =~ ^fix\( ]] || [[ "$commit_msg" =~ ^perf: ]] || [[ "$commit_msg" =~ ^perf\( ]]; then
-              if [ "$HIGHEST_BUMP" = "none" ]; then
-                HIGHEST_BUMP="patch"
-              fi
             fi
+            
+            # Extract conventional type from different formats
+            COMMIT_TYPE=""
+            
+            # New format: {issue}: {type}(!): {description}
+            if [[ "$commit_msg" =~ ^[0-9]+:\ (feat|fix|perf|docs|style|refactor|test|chore|ci|build|revert)(!)?:\ .+ ]]; then
+              COMMIT_TYPE=$(echo "$commit_msg" | sed -n 's/^[0-9]\+: \([a-z]\+\)\(!\\)\?: .*/\1\2/p')
+            # Standard format: {type}(!): {description} or {type}(!)(scope): {description}  
+            elif [[ "$commit_msg" =~ ^(feat|fix|perf|docs|style|refactor|test|chore|ci|build|revert)(!)?:\ .+ ]] || [[ "$commit_msg" =~ ^(feat|fix|perf|docs|style|refactor|test|chore|ci|build|revert)(!)?(\(.+\))?:\ .+ ]]; then
+              COMMIT_TYPE=$(echo "$commit_msg" | sed -n 's/^\([a-z]\+\)\(!\\)\?\((.*)\\)\?: .*/\1\2/p')
+            fi
+            
+            # Determine bump type based on commit type
+            case "$COMMIT_TYPE" in
+              *!)
+                # Breaking change
+                HIGHEST_BUMP="major"
+                break
+                ;;
+              feat)
+                # New feature
+                if [ "$HIGHEST_BUMP" != "major" ]; then
+                  HIGHEST_BUMP="minor"
+                fi
+                ;;
+              fix|perf)
+                # Bug fix or performance improvement
+                if [ "$HIGHEST_BUMP" = "none" ]; then
+                  HIGHEST_BUMP="patch"
+                fi
+                ;;
+            esac
           done <<< "$COMMITS_SINCE_RELEASE"
           
           # Parse baseline version numbers

@@ -57,9 +57,42 @@ The commit message will also include:
 BREAKING CHANGE: {Breaking Change Description from above}
 ```
 
+## PR Title Format
+
+**New format (recommended for automatic releases):**
+```
+{issue#}: {type}: {description}
+```
+
+**Examples:**
+- `27: fix: improve error handling in API responses`
+- `34: feat: add user authentication with OAuth`
+- `42: perf: optimize database queries for large datasets`
+- `18: feat!: breaking change to configuration API`
+
+**Legacy format (deprecated but still accepted):**
+```
+{issue#}: {description}
+```
+
+**Valid conventional commit types:**
+- `feat`: New features (minor version bump)
+- `fix`: Bug fixes (patch version bump)  
+- `perf`: Performance improvements (patch version bump)
+- `docs`: Documentation changes (no version bump)
+- `style`: Code style changes (no version bump)
+- `refactor`: Code refactoring (no version bump)
+- `test`: Test changes (no version bump)
+- `chore`: Maintenance tasks (no version bump)
+- `ci`: CI/CD changes (no version bump)
+- `build`: Build system changes (no version bump)
+- `revert`: Revert previous changes (no version bump)
+
+Add `!` after the type for breaking changes: `feat!:` or `fix!:`
+
 ## Pre-merge Checklist
 - [ ] Branch name follows convention: `(feature|hotfix|epic)/{issue#}-description`
-- [ ] PR title includes issue number: `{issue#}: Description`
+- [ ] PR title follows new format: `{issue#}: {type}: {description}` (or legacy format during transition)
 - [ ] All CI checks are passing (branch validation, tests, linting)
 - [ ] Code follows project conventions and style guide
 - [ ] Self-review completed
