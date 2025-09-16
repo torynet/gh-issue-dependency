@@ -62,7 +62,7 @@ jobs:
           # Check for standard conventional commit format: {type}: {description}
           elif [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?:\ .+ ]] || [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?(\(.+\))?:\ .+ ]]; then
             # Extract the type (with potential ! for breaking change)
-            CONVENTIONAL_TYPE=$(echo "$COMMIT_SUBJECT" | sed -E -n 's/^([a-z]+)(!)?(\\(.+\\))?: .*/\1\2/p')
+            CONVENTIONAL_TYPE=$(echo "$COMMIT_SUBJECT" | sed -E -n 's/^([a-z]+)(!)?(\(.+\))?: .*/\1\2/p')
             echo "🔍 Extracted conventional type from standard format: $CONVENTIONAL_TYPE"
             
           # Legacy format without conventional commit type - no release
@@ -155,7 +155,7 @@ jobs:
               COMMIT_TYPE=$(echo "$commit_msg" | sed -E -n 's/^[0-9]+: ([a-z]+)(!)?: .*/\1\2/p')
             # Standard format: {type}(!): {description} or {type}(!)(scope): {description}  
             elif [[ "$commit_msg" =~ ^(feat|fix|perf|docs|style|refactor|test|chore|ci|build|revert)(!)?:\ .+ ]] || [[ "$commit_msg" =~ ^(feat|fix|perf|docs|style|refactor|test|chore|ci|build|revert)(!)?(\(.+\))?:\ .+ ]]; then
-              COMMIT_TYPE=$(echo "$commit_msg" | sed -E -n 's/^([a-z]+)(!)?(\\(.+\\))?: .*/\1\2/p')
+              COMMIT_TYPE=$(echo "$commit_msg" | sed -E -n 's/^([a-z]+)(!)?(\(.+\))?: .*/\1\2/p')
             fi
             
             # Determine bump type based on commit type
