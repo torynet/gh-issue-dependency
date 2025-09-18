@@ -298,8 +298,8 @@ jobs:
     steps:
       - name: Check if issue unblocks others
         run: |
-          # Install gh-issue-dependency
-          go install github.com/torynet/gh-issue-dependency@latest
+          # Install gh-issue-dependency as extension
+          gh extension install torynet/gh-issue-dependency
           
           # Find issues blocked by this one
           blocked_issues=$(gh issue-dependency list ${{ github.event.issue.number }} --format json | jq -r '.blocks[]?.number')

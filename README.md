@@ -24,14 +24,24 @@ A powerful GitHub CLI extension for managing issue dependencies with comprehensi
 - **GitHub CLI** - [Install GitHub CLI](https://cli.github.com/) and authenticate with `gh auth login`
 - **Git** installed on your system
 
-### Quick Install (Recommended)
+### GitHub CLI Extension (Recommended)
+
+```bash
+# Install as GitHub CLI extension
+gh extension install torynet/gh-issue-dependency
+
+# Verify installation
+gh issue-dependency --help
+```
+
+### Alternative Installation (Development/Testing)
 
 ```bash
 # Install via Go (requires Go 1.19+)
 go install github.com/torynet/gh-issue-dependency@latest
 
-# Verify installation
-gh issue-dependency --help
+# Verify installation (note: standalone binary)
+gh-issue-dependency --help
 ```
 
 ### Download Binary
