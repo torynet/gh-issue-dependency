@@ -50,18 +50,6 @@ gh-issue-dependency --help
 2. Download the binary for your system
 3. Extract and place in your PATH
 
-### Package Managers
-
-```bash
-# Homebrew (macOS/Linux)
-brew install torynet/tap/gh-issue-dependency
-
-# Chocolatey (Windows)
-choco install gh-issue-dependency
-
-# Scoop (Windows)
-scoop install gh-issue-dependency
-```
 
 📖 **[Complete Installation Guide →](https://torynet.github.io/gh-issue-dependency/getting-started/)**
 
