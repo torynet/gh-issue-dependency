@@ -32,6 +32,9 @@ go install github.com/torynet/gh-issue-dependency@latest
 2. Download the appropriate binary for your system
 3. Extract and place in your PATH
 
+!!! note "Package Managers"
+    Package manager support (Homebrew, Chocolatey, etc.) is planned for future releases. 
+    For now, we recommend using the GitHub CLI extension method for the best experience.
 
 ## Verify Installation
 

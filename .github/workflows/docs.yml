@@ -61,7 +61,7 @@ jobs:
         run: |
           mkdocs build --clean --strict
         env:
-          SITE_URL: ${{ steps.pages.outputs.base_url || '' }}
+          SITE_URL: ${{ steps.pages.outputs.base_url || 'https://torynet.github.io/gh-issue-dependency' }}
 
       - name: Upload artifact
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
