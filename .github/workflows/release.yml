@@ -1,24 +1,119 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
-      - '!v*-rc*'  # Exclude RC tags
+  release:
+    types: [released]  # Triggered when pre-release is promoted to release
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Release tag to build (e.g., v1.2.0)'
+      rc_tag:
+        description: 'RC tag to promote to release (e.g., v1.2.0-rc1)'
         required: true
-        default: 'v0.1.0'
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  build:
-    name: Build and Release
+  promote-to-release:
+    name: Promote RC to Production Release
+    runs-on: ubuntu-latest
+    environment: 
+      name: release
+      url: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.release_tag }}
+    outputs:
+      rc_tag: ${{ steps.version.outputs.rc_tag }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version information
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RC_TAG="${{ github.event.inputs.rc_tag }}"
+            
+            # Validate RC tag format
+            if [[ ! "$RC_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+              echo "❌ Invalid RC tag format: $RC_TAG"
+              echo "Expected format: v1.2.3-rc1"
+              exit 1
+            fi
+            
+          else
+            # Release event - extract RC tag from the promoted release
+            PROMOTED_TAG="${{ github.event.release.tag_name }}"
+            
+            # Check if this is an RC tag being promoted
+            if [[ "$PROMOTED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+              RC_TAG="$PROMOTED_TAG"
+            else
+              echo "❌ Release promotion workflow should only handle RC tags, got: $PROMOTED_TAG"
+              exit 1
+            fi
+          fi
+          
+          # Convert RC tag to release tag (v1.2.0-rc1 -> v1.2.0)
+          RELEASE_TAG=${RC_TAG%-rc*}
+          
+          echo "rc_tag=$RC_TAG" >> $GITHUB_OUTPUT
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          
+          echo "🏷️ Promoting RC: $RC_TAG → Release: $RELEASE_TAG"
+
+      - name: Verify RC tag exists
+        run: |
+          RC_TAG="${{ steps.version.outputs.rc_tag }}"
+          
+          # Check if RC tag exists
+          if ! git rev-parse "refs/tags/$RC_TAG" >/dev/null 2>&1; then
+            echo "❌ RC tag does not exist: $RC_TAG"
+            echo "Available tags:"
+            git tag -l "v*-rc*" | tail -10
+            exit 1
+          fi
+          
+          echo "✅ RC tag exists: $RC_TAG"
+
+      - name: Create production release tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          RC_TAG="${{ steps.version.outputs.rc_tag }}"
+          RELEASE_TAG="${{ steps.version.outputs.release_tag }}"
+          
+          # Get the commit that the RC tag points to
+          RC_COMMIT=$(git rev-list -n 1 "refs/tags/$RC_TAG")
+          
+          echo "🏷️ Creating release tag: $RELEASE_TAG from RC: $RC_TAG"
+          echo "📍 Commit: $RC_COMMIT"
+          
+          # Check if release tag already exists
+          if git rev-parse "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "⚠️ Release tag already exists: $RELEASE_TAG"
+            EXISTING_COMMIT=$(git rev-list -n 1 "refs/tags/$RELEASE_TAG")
+            if [ "$RC_COMMIT" = "$EXISTING_COMMIT" ]; then
+              echo "✅ Release tag points to same commit as RC tag"
+            else
+              echo "❌ Release tag points to different commit than RC tag"
+              echo "RC commit: $RC_COMMIT"
+              echo "Release commit: $EXISTING_COMMIT"
+              exit 1
+            fi
+          else
+            # Create new release tag
+            git tag -a "$RELEASE_TAG" "$RC_COMMIT" -m "Release $RELEASE_TAG (promoted from $RC_TAG)"
+            git push origin "$RELEASE_TAG"
+            echo "✅ Created production release tag: $RELEASE_TAG"
+          fi
+
+  build-production:
+    name: Build Production Release
+    needs: promote-to-release
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -42,7 +137,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: ${{ needs.promote-to-release.outputs.release_tag }}
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -56,22 +151,8 @@ jobs:
             ~/.cache/go-build
             ~/go/pkg/mod
           key: ${{ runner.os }}-go-1.21-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-1.21-
 
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run tests
-        run: go test -v -race ./...
-
-      - name: Build binary
+      - name: Build production binary
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -83,10 +164,12 @@ jobs:
             EXT=".exe"
           fi
           
+          # Use proper GitHub CLI extension naming (without version number)
           BINARY_NAME="gh-issue-dependency-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
           
+          echo "Building production $BINARY_NAME for release ${{ needs.promote-to-release.outputs.release_tag }}..."
           go build \
-            -ldflags "-s -w -X cmd.Version=${{ steps.version.outputs.version }} -X cmd.Commit=${GITHUB_SHA:0:8} -X cmd.BuildType=release" \
+            -ldflags "-s -w -X cmd.Version=${{ needs.promote-to-release.outputs.release_tag }} -X cmd.Commit=${GITHUB_SHA:0:8} -X cmd.BuildType=release" \
             -o "dist/${BINARY_NAME}" \
             .
           
@@ -94,99 +177,99 @@ jobs:
           cd dist
           sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
 
-      - name: Upload build artifacts
+      - name: Upload production artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: production-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
 
-  release:
-    name: Create Release
+  create-production-release:
+    name: Create Production Release
+    needs: [promote-to-release, build-production]
     runs-on: ubuntu-latest
-    needs: build
-    environment: 
-      name: release
-      url: https://github.com/${{ github.repository }}/releases
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ needs.promote-to-release.outputs.release_tag }}
           fetch-depth: 0
 
-      - name: Download build artifacts
+      - name: Download all production artifacts
         uses: actions/download-artifact@v4
         with:
-          name: binaries
           path: dist/
+          pattern: production-binaries-*
+          merge-multiple: true
 
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Generate changelog
+      - name: Generate production changelog
         id: changelog
         run: |
-          if [ -f CHANGELOG.md ]; then
-            # Extract changelog for this version
-            awk '/^## \['${{ steps.version.outputs.version }}'\]/{flag=1; next} /^## \[/{flag=0} flag' CHANGELOG.md > release_notes.md
-          else
-            # Generate basic changelog from commits
+          RELEASE_TAG="${{ needs.promote-to-release.outputs.release_tag }}"
+          RC_TAG="${{ needs.promote-to-release.outputs.rc_tag }}"
+          
+          # Generate changelog from commits since last release
+          LATEST_RELEASE=$(git tag -l "v*" | grep -v "rc" | sort -V | grep -v "^$RELEASE_TAG$" | tail -1)
+          if [ -z "$LATEST_RELEASE" ]; then
             echo "## Changes" > release_notes.md
-            git log --pretty=format:"- %s (%h)" $(git describe --tags --abbrev=0 HEAD~1)..HEAD >> release_notes.md 2>/dev/null || echo "- Initial release" >> release_notes.md
+            echo "- Initial production release" >> release_notes.md
+          else
+            echo "## Changes since $LATEST_RELEASE" > release_notes.md
+            git log --pretty=format:"- %s (%h)" ${LATEST_RELEASE}..HEAD >> release_notes.md
           fi
+          
+          # Add production release info
+          echo "" >> release_notes.md
+          echo "## 🚀 Production Release" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "This is a **production release** promoted from release candidate \`$RC_TAG\`." >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### GitHub CLI Extension Installation" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "# Install or upgrade to latest stable version" >> release_notes.md
+          echo "gh extension install torynet/gh-issue-dependency" >> release_notes.md
+          echo "# or upgrade if already installed" >> release_notes.md
+          echo "gh extension upgrade torynet/gh-issue-dependency" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "**Promoted from**: $RC_TAG" >> release_notes.md
+          echo "**Commit**: ${{ github.sha }}" >> release_notes.md
+          echo "**Build**: ${{ github.run_id }}" >> release_notes.md
 
-      - name: Create Release
+      - name: Create Production Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.version.outputs.version }}
-          name: Release ${{ steps.version.outputs.version }}
+          tag_name: ${{ needs.promote-to-release.outputs.release_tag }}
+          name: Release ${{ needs.promote-to-release.outputs.release_tag }}
           body_path: release_notes.md
           draft: false
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          prerelease: false
           files: |
             dist/*
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  update-homebrew:
-    name: Update Homebrew Formula
+  notify-production-release:
+    name: Notify Production Release
+    needs: [promote-to-release, create-production-release]
     runs-on: ubuntu-latest
-    needs: release
-    if: ${{ !contains(needs.release.outputs.version, '-') }} # Only for stable releases
-    steps:
-      - name: Update Homebrew formula
-        run: |
-          echo "TODO: Update Homebrew formula"
-          # This would typically use a separate action or API call
-          # to update the Homebrew formula in a tap repository
-
-  notify:
-    name: Notify Release
-    runs-on: ubuntu-latest
-    needs: release
     if: always()
+    
     steps:
-      - name: Get version
-        id: version
+      - name: Notify release completion
+        if: needs.create-production-release.result == 'success'
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          fi
+          echo "🚀 Production release ${{ needs.promote-to-release.outputs.release_tag }} completed successfully!"
+          echo "📦 Release available at: https://github.com/${{ github.repository }}/releases/tag/${{ needs.promote-to-release.outputs.release_tag }}"
+          echo ""
+          echo "🔧 GitHub CLI Extension Installation:"
+          echo "gh extension install torynet/gh-issue-dependency"
+          echo "gh extension upgrade torynet/gh-issue-dependency"
+          echo ""
+          echo "✅ Promoted from RC: ${{ needs.promote-to-release.outputs.rc_tag }}"
 
-      - name: Notify success
-        if: needs.release.result == 'success'
+      - name: Notify release failure
+        if: needs.create-production-release.result == 'failure'
         run: |
-          echo "✅ Release ${{ steps.version.outputs.version }} completed successfully!"
-          echo "Download: https://github.com/torynet/gh-issue-dependency/releases/tag/${{ steps.version.outputs.version }}"
-
-      - name: Notify failure
-        if: needs.release.result == 'failure'
-        run: |
-          echo "❌ Release ${{ steps.version.outputs.version }} failed!"
+          echo "❌ Production release ${{ needs.promote-to-release.outputs.release_tag }} failed!"
+          echo "RC tag: ${{ needs.promote-to-release.outputs.rc_tag }}"
           exit 1

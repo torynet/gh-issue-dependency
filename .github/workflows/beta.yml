@@ -2,28 +2,31 @@ name: Beta
 
 on:
   push:
-    tags:
-      - 'v*-rc*'  # Only RC tags
+    branches: 
+      - main
+      - 'hotfix/**'
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'RC tag to deploy (e.g., v1.2.0-rc1)'
-        required: true
+      force_rc:
+        description: 'Force RC creation even if tests fail'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
-  beta-deploy:
-    name: Deploy Beta Release
+  test-and-validate:
+    name: Test and Validate
     runs-on: ubuntu-latest
-    environment: 
-      name: beta
-      url: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}
     outputs:
-      rc_tag: ${{ steps.version.outputs.version }}
-      release_tag: ${{ steps.release_version.outputs.release_tag }}
+      should_create_rc: ${{ steps.conventional.outputs.should_release }}
+      rc_tag: ${{ steps.version.outputs.rc_tag }}
+      new_version: ${{ steps.version.outputs.new_version }}
+      conventional_type: ${{ steps.conventional.outputs.conventional_type }}
+      bump_type: ${{ steps.conventional.outputs.bump_type }}
     
     steps:
       - name: Checkout
@@ -36,134 +39,230 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Validate RC tag
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
-            echo "❌ Invalid RC tag format: $VERSION"
-            echo "Expected format: v1.2.3-rc1"
-            exit 1
-          fi
-          echo "✅ Valid RC tag: $VERSION"
-
-      - name: Calculate release version
-        id: release_version
-        run: |
-          RC_TAG="${{ steps.version.outputs.version }}"
-          # Convert RC tag to release tag (v1.2.0-rc1 -> v1.2.0)
-          RELEASE_TAG=${RC_TAG%-rc*}
-          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-          echo "📋 RC: $RC_TAG → Release: $RELEASE_TAG"
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-1.21-${{ hashFiles('**/go.sum') }}
 
       - name: Run tests
-        run: go test -v -race ./...
-
-      - name: Build beta binaries
         run: |
-          mkdir -p dist
+          echo "🧪 Running unit tests..."
+          go test -v -race ./...
+
+      - name: Run linting
+        run: |
+          echo "🔍 Running linting..."
+          # Install golangci-lint if not available
+          if ! command -v golangci-lint &> /dev/null; then
+            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
+          fi
+          golangci-lint run
+
+      - name: Run integration tests
+        run: |
+          echo "🔄 Running integration tests..."
+          if [ -f "./tests/integration_test.sh" ]; then
+            chmod +x ./tests/integration_test.sh
+            ./tests/integration_test.sh
+          else
+            echo "ℹ️ No integration tests found"
+          fi
+
+      - name: Analyze conventional commit
+        id: conventional
+        run: |
+          # Get commit subject (first line only) for conventional commit analysis
+          COMMIT_SUBJECT="$(git log -1 --pretty=%s)"
+          COMMIT_BODY="$(git log -1 --pretty=%B)"
           
-          # Build for multiple platforms
-          PLATFORMS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+          echo "commit_subject=$COMMIT_SUBJECT" >> $GITHUB_OUTPUT
           
-          for platform in $PLATFORMS; do
-            GOOS=${platform%/*}
-            GOARCH=${platform#*/}
+          # Use heredoc for multiline commit message
+          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Check if this is a conventional commit that should trigger release
+          SHOULD_RELEASE="false"
+          BUMP_TYPE=""
+          CONVENTIONAL_TYPE=""
+          
+          # Extract conventional commit type from new format: {issue}: {type}: {description}
+          if [[ "$COMMIT_SUBJECT" =~ ^[0-9]+:\ (feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?:\ .+ ]]; then
+            # Extract the type (with potential ! for breaking change)
+            CONVENTIONAL_TYPE=$(echo "$COMMIT_SUBJECT" | sed -E -n 's/^[0-9]+: ([a-z]+)(!)?: .*/\1\2/p')
+            echo "🔍 Extracted conventional type from new format: $CONVENTIONAL_TYPE"
             
-            EXT=""
-            if [ "$GOOS" = "windows" ]; then
-              EXT=".exe"
+          # Check for standard conventional commit format: {type}: {description}
+          elif [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?:\ .+ ]] || [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?(\(.+\))?:\ .+ ]]; then
+            # Extract the type (with potential ! for breaking change)
+            CONVENTIONAL_TYPE=$(echo "$COMMIT_SUBJECT" | sed -E -n 's/^([a-z]+)(!)?(\(.+\))?: .*/\1\2/p')
+            echo "🔍 Extracted conventional type from standard format: $CONVENTIONAL_TYPE"
+            
+          # Legacy format without conventional commit type - no release
+          else
+            echo "ℹ️ Commit does not follow conventional commit format for releases: $COMMIT_SUBJECT"
+            echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Determine release type based on conventional commit type
+          case "$CONVENTIONAL_TYPE" in
+            *!)
+              # Breaking change (any type with !)
+              SHOULD_RELEASE="true"
+              BUMP_TYPE="major"
+              ;;
+            feat)
+              # New feature
+              SHOULD_RELEASE="true"
+              BUMP_TYPE="minor"
+              ;;
+            fix|perf)
+              # Bug fix or performance improvement
+              SHOULD_RELEASE="true"
+              BUMP_TYPE="patch"
+              ;;
+            docs|style|refactor|test|chore|ci|build|revert)
+              # Non-release types
+              SHOULD_RELEASE="false"
+              echo "ℹ️ Commit type '$CONVENTIONAL_TYPE' does not trigger releases"
+              ;;
+            *)
+              # Unknown type
+              SHOULD_RELEASE="false"
+              echo "⚠️ Unknown conventional commit type: $CONVENTIONAL_TYPE"
+              ;;
+          esac
+          
+          # Check for breaking changes in commit body
+          if [[ "$COMMIT_BODY" == *"BREAKING CHANGE"* ]]; then
+            SHOULD_RELEASE="true"
+            BUMP_TYPE="major"
+            echo "🚨 Breaking change detected in commit body"
+          fi
+          
+          # Override if force_rc is set
+          if [ "${{ github.event.inputs.force_rc }}" = "true" ]; then
+            SHOULD_RELEASE="true"
+            if [ -z "$BUMP_TYPE" ]; then
+              BUMP_TYPE="patch"
             fi
-            
-            BINARY_NAME="gh-issue-dependency-${{ steps.version.outputs.version }}-${GOOS}-${GOARCH}${EXT}"
-            
-            echo "Building $BINARY_NAME..."
-            GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build \
-              -ldflags "-s -w -X cmd.Version=${{ steps.version.outputs.version }} -X cmd.Commit=${GITHUB_SHA:0:8} -X cmd.BuildType=beta" \
-              -o "dist/${BINARY_NAME}" \
-              .
-            
-            # Create checksums
-            cd dist
-            sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
-            cd ..
-          done
+            echo "🚀 Force RC creation enabled"
+          fi
+          
+          echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+          echo "conventional_type=$CONVENTIONAL_TYPE" >> $GITHUB_OUTPUT
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          
+          if [ "$SHOULD_RELEASE" = "true" ]; then
+            echo "✅ Tests passed and conventional commit detected: $COMMIT_SUBJECT (type: $CONVENTIONAL_TYPE, bump: $BUMP_TYPE)"
+          else
+            echo "ℹ️ Tests passed but commit does not trigger release: $COMMIT_SUBJECT (type: $CONVENTIONAL_TYPE)"
+          fi
 
-      - name: Create beta release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.version.outputs.version }}
-          name: Beta Release ${{ steps.version.outputs.version }}
-          body: |
-            ## 🧪 Beta Release
-            
-            This is a beta release for testing purposes. 
-            
-            **⚠️ Not recommended for production use.**
-            
-            ### Installation
-            Download the appropriate binary for your platform and add it to your PATH.
-            
-            ### Testing
-            Please test this beta version and report any issues.
-            
-            **Commit**: ${{ github.sha }}
-            **Built**: ${{ github.run_id }}
-          draft: false
-          prerelease: true
-          files: |
-            dist/*
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Notify beta deployment
+      - name: Calculate next version
+        if: steps.conventional.outputs.should_release == 'true'
+        id: version
         run: |
-          echo "🧪 Beta deployment completed!"
-          echo "RC Version: ${{ steps.version.outputs.version }}"
-          echo "Target Release: ${{ steps.release_version.outputs.release_tag }}"
-          echo "Download: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
-          echo ""
-          echo "🔬 Test this beta release thoroughly"
-          echo "✅ If ready for production, approve the next step to create release tag"
+          # Get latest release tag (not RC tags) - this is our baseline
+          LATEST_RELEASE=$(git tag -l "v*" | grep -v "rc" | sort -V | tail -1)
+          if [ -z "$LATEST_RELEASE" ]; then
+            LATEST_RELEASE="v0.0.0"
+          fi
+          echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          
+          # Parse baseline version numbers
+          BASE_VERSION=${LATEST_RELEASE#v}
+          IFS='.' read -r -a VERSION_PARTS <<< "$BASE_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]:-0}
+          PATCH=${VERSION_PARTS[2]:-0}
+          
+          # Calculate target version based on bump type
+          BUMP_TYPE="${{ steps.conventional.outputs.bump_type }}"
+          case "$BUMP_TYPE" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+          
+          TARGET_VERSION="$MAJOR.$MINOR.$PATCH"
+          
+          # Find next RC number for this target version
+          EXISTING_RCS=$(git tag -l "v${TARGET_VERSION}-rc*" | sort -V)
+          if [ -z "$EXISTING_RCS" ]; then
+            RC_NUMBER=1
+          else
+            # Get the highest RC number for this target version
+            HIGHEST_RC=$(echo "$EXISTING_RCS" | tail -1)
+            # Extract RC number (e.g., v1.2.3-rc4 -> 4)
+            RC_NUMBER=$(echo "$HIGHEST_RC" | sed 's/.*-rc//')
+            RC_NUMBER=$((RC_NUMBER + 1))
+          fi
+          
+          RC_TAG="v${TARGET_VERSION}-rc${RC_NUMBER}"
+          
+          echo "new_version=$TARGET_VERSION" >> $GITHUB_OUTPUT
+          echo "rc_tag=$RC_TAG" >> $GITHUB_OUTPUT
+          echo "rc_number=$RC_NUMBER" >> $GITHUB_OUTPUT
+          
+          echo "🏗️ Target version: $TARGET_VERSION (from baseline $LATEST_RELEASE, bump: $BUMP_TYPE)"
+          echo "🔢 RC tag: $RC_TAG"
 
-  # Manual approval gate to promote RC to production release
-  promote-to-release:
-    name: Promote RC to Release
-    needs: beta-deploy
+  create-rc-tag:
+    name: Create RC Tag
+    needs: test-and-validate
+    if: needs.test-and-validate.outputs.should_create_rc == 'true'
     runs-on: ubuntu-latest
-    environment:
-      name: beta-approval
-      url: https://github.com/${{ github.repository }}/releases/tag/${{ needs.beta-deploy.outputs.release_tag }}
-    
+    outputs:
+      rc_tag: ${{ needs.test-and-validate.outputs.rc_tag }}
+      
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Create production release tag
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create RC Tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          RC_TAG="${{ needs.beta-deploy.outputs.rc_tag }}"
-          RELEASE_TAG="${{ needs.beta-deploy.outputs.release_tag }}"
+          RC_TAG="${{ needs.test-and-validate.outputs.rc_tag }}"
           
-          # Get the commit that the RC tag points to
-          RC_COMMIT=$(git rev-list -n 1 "$RC_TAG")
+          git tag -a "$RC_TAG" -m "Release Candidate $RC_TAG"
+          git push origin "$RC_TAG"
           
-          echo "🏷️ Creating release tag: $RELEASE_TAG from RC: $RC_TAG"
-          echo "📍 Commit: $RC_COMMIT"
-          
-          git tag -a "$RELEASE_TAG" $RC_COMMIT -m "Release $RELEASE_TAG (promoted from $RC_TAG)"
-          git push origin "$RELEASE_TAG"
-          
-          echo "✅ Created production release tag: $RELEASE_TAG"
-          echo "🚀 Release workflow will now deploy this to production"
+          echo "🚀 Created RC tag: $RC_TAG"
+          echo "📋 This will trigger the RC workflow to build artifacts and create pre-release"
+
+  notify-completion:
+    name: Notify Completion
+    needs: [test-and-validate, create-rc-tag]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Notify Results
+        run: |
+          if [ "${{ needs.test-and-validate.result }}" = "failure" ]; then
+            echo "❌ Tests failed - no RC will be created"
+            exit 1
+          elif [ "${{ needs.test-and-validate.outputs.should_create_rc }}" = "true" ]; then
+            if [ "${{ needs.create-rc-tag.result }}" = "success" ]; then
+              echo "✅ All tests passed and RC tag created: ${{ needs.test-and-validate.outputs.rc_tag }}"
+              echo "🔄 RC workflow will now build artifacts and create pre-release"
+            else
+              echo "❌ Tests passed but RC tag creation failed"
+              exit 1
+            fi
+          else
+            echo "✅ All tests passed but commit does not trigger release"
+            echo "ℹ️ Type: ${{ needs.test-and-validate.outputs.conventional_type }}"
+          fi
+

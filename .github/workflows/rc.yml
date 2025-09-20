@@ -2,351 +2,48 @@ name: RC
 
 on:
   push:
-    branches: 
-      - main
-      - 'hotfix/**'
+    tags:
+      - 'v*-rc*'  # Only RC tags
   workflow_dispatch:
     inputs:
-      promote_rc_to_release:
-        description: 'RC tag to promote to release (e.g., v1.2.0-rc1)'
+      tag:
+        description: 'RC tag to build (e.g., v1.2.0-rc1)'
         required: true
-        type: string
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  # Runs on main branch pushes (squash merges) 
-  create-rc:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    name: Create RC from Main Push
+  build-rc:
+    name: Build RC Artifacts
     runs-on: ubuntu-latest
     outputs:
       rc_tag: ${{ steps.version.outputs.rc_tag }}
-      should_create_rc: ${{ steps.conventional.outputs.should_release }}
-      new_version: ${{ steps.version.outputs.new_version }}
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Analyze conventional commit
-        id: conventional
-        run: |
-          # Get commit subject (first line only) for conventional commit analysis
-          COMMIT_SUBJECT="$(git log -1 --pretty=%s)"
-          COMMIT_BODY="$(git log -1 --pretty=%B)"
-          
-          echo "commit_subject=$COMMIT_SUBJECT" >> $GITHUB_OUTPUT
-          
-          # Use heredoc for multiline commit message
-          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMIT_BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          # Check if this is a conventional commit that should trigger release
-          SHOULD_RELEASE="false"
-          BUMP_TYPE=""
-          CONVENTIONAL_TYPE=""
-          
-          # Extract conventional commit type from new format: {issue}: {type}: {description}
-          if [[ "$COMMIT_SUBJECT" =~ ^[0-9]+:\ (feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?:\ .+ ]]; then
-            # Extract the type (with potential ! for breaking change)
-            CONVENTIONAL_TYPE=$(echo "$COMMIT_SUBJECT" | sed -E -n 's/^[0-9]+: ([a-z]+)(!)?: .*/\1\2/p')
-            echo "🔍 Extracted conventional type from new format: $CONVENTIONAL_TYPE"
-            
-          # Check for standard conventional commit format: {type}: {description}
-          elif [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?:\ .+ ]] || [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?(\(.+\))?:\ .+ ]]; then
-            # Extract the type (with potential ! for breaking change)
-            CONVENTIONAL_TYPE=$(echo "$COMMIT_SUBJECT" | sed -E -n 's/^([a-z]+)(!)?(\(.+\))?: .*/\1\2/p')
-            echo "🔍 Extracted conventional type from standard format: $CONVENTIONAL_TYPE"
-            
-          # Legacy format without conventional commit type - no release
-          else
-            echo "ℹ️ Commit does not follow conventional commit format for releases: $COMMIT_SUBJECT"
-            echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # Determine release type based on conventional commit type
-          case "$CONVENTIONAL_TYPE" in
-            *!)
-              # Breaking change (any type with !)
-              SHOULD_RELEASE="true"
-              BUMP_TYPE="major"
-              ;;
-            feat)
-              # New feature
-              SHOULD_RELEASE="true"
-              BUMP_TYPE="minor"
-              ;;
-            fix|perf)
-              # Bug fix or performance improvement
-              SHOULD_RELEASE="true"
-              BUMP_TYPE="patch"
-              ;;
-            docs|style|refactor|test|chore|ci|build|revert)
-              # Non-release types
-              SHOULD_RELEASE="false"
-              echo "ℹ️ Commit type '$CONVENTIONAL_TYPE' does not trigger releases"
-              ;;
-            *)
-              # Unknown type
-              SHOULD_RELEASE="false"
-              echo "⚠️ Unknown conventional commit type: $CONVENTIONAL_TYPE"
-              ;;
-          esac
-          
-          # Check for breaking changes in commit body
-          if [[ "$COMMIT_BODY" == *"BREAKING CHANGE"* ]]; then
-            SHOULD_RELEASE="true"
-            BUMP_TYPE="major"
-            echo "🚨 Breaking change detected in commit body"
-          fi
-          
-          echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
-          echo "conventional_type=$CONVENTIONAL_TYPE" >> $GITHUB_OUTPUT
-          
-          if [ "$SHOULD_RELEASE" = "true" ]; then
-            echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
-            echo "✅ Conventional commit detected: $COMMIT_SUBJECT (type: $CONVENTIONAL_TYPE, bump: $BUMP_TYPE)"
-          else
-            echo "ℹ️ Commit does not trigger release: $COMMIT_SUBJECT (type: $CONVENTIONAL_TYPE)"
-          fi
-
-      - name: Calculate next version
-        if: steps.conventional.outputs.should_release == 'true'
-        id: version
-        run: |
-          # Get latest release tag (not RC tags) - this is our baseline
-          LATEST_RELEASE=$(git tag -l "v*" | grep -v "rc" | sort -V | tail -1)
-          if [ -z "$LATEST_RELEASE" ]; then
-            LATEST_RELEASE="v0.0.0"
-          fi
-          echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
-          
-          # Get all commits since the latest release to determine target version
-          if [ "$LATEST_RELEASE" = "v0.0.0" ]; then
-            # No releases yet, analyze all commits
-            COMMITS_SINCE_RELEASE=$(git log --pretty=format:"%s" HEAD)
-          else
-            # Get commits since the last release
-            COMMITS_SINCE_RELEASE=$(git log --pretty=format:"%s" ${LATEST_RELEASE}..HEAD)
-          fi
-          
-          # Analyze all commits since last release to find highest bump type needed
-          HIGHEST_BUMP="none"
-          while IFS= read -r commit_msg; do
-            # Check for breaking changes (any format)
-            if [[ "$commit_msg" == *"BREAKING CHANGE"* ]]; then
-              HIGHEST_BUMP="major"
-              break  # Major is highest, no need to continue
-            fi
-            
-            # Extract conventional type from different formats
-            COMMIT_TYPE=""
-            
-            # New format: {issue}: {type}(!): {description}
-            if [[ "$commit_msg" =~ ^[0-9]+:\ (feat|fix|perf|docs|style|refactor|test|chore|ci|build|revert)(!)?:\ .+ ]]; then
-              COMMIT_TYPE=$(echo "$commit_msg" | sed -E -n 's/^[0-9]+: ([a-z]+)(!)?: .*/\1\2/p')
-            # Standard format: {type}(!): {description} or {type}(!)(scope): {description}  
-            elif [[ "$commit_msg" =~ ^(feat|fix|perf|docs|style|refactor|test|chore|ci|build|revert)(!)?:\ .+ ]] || [[ "$commit_msg" =~ ^(feat|fix|perf|docs|style|refactor|test|chore|ci|build|revert)(!)?(\(.+\))?:\ .+ ]]; then
-              COMMIT_TYPE=$(echo "$commit_msg" | sed -E -n 's/^([a-z]+)(!)?(\(.+\))?: .*/\1\2/p')
-            fi
-            
-            # Determine bump type based on commit type
-            case "$COMMIT_TYPE" in
-              *!)
-                # Breaking change
-                HIGHEST_BUMP="major"
-                break
-                ;;
-              feat)
-                # New feature
-                if [ "$HIGHEST_BUMP" != "major" ]; then
-                  HIGHEST_BUMP="minor"
-                fi
-                ;;
-              fix|perf)
-                # Bug fix or performance improvement
-                if [ "$HIGHEST_BUMP" = "none" ]; then
-                  HIGHEST_BUMP="patch"
-                fi
-                ;;
-            esac
-          done <<< "$COMMITS_SINCE_RELEASE"
-          
-          # Parse baseline version numbers
-          BASE_VERSION=${LATEST_RELEASE#v}
-          IFS='.' read -r -a VERSION_PARTS <<< "$BASE_VERSION"
-          MAJOR=${VERSION_PARTS[0]}
-          MINOR=${VERSION_PARTS[1]:-0}
-          PATCH=${VERSION_PARTS[2]:-0}
-          
-          # Calculate target version based on highest bump type needed
-          case "$HIGHEST_BUMP" in
-            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
-            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
-            patch) PATCH=$((PATCH + 1)) ;;
-            none) 
-              echo "⚠️ No version bump needed - commits don't follow conventional format for releases"
-              exit 0
-              ;;
-          esac
-          
-          TARGET_VERSION="$MAJOR.$MINOR.$PATCH"
-          
-          # Find next RC number for this target version
-          EXISTING_RCS=$(git tag -l "v${TARGET_VERSION}-rc*" | sort -V)
-          if [ -z "$EXISTING_RCS" ]; then
-            RC_NUMBER=1
-          else
-            # Get the highest RC number for this target version
-            HIGHEST_RC=$(echo "$EXISTING_RCS" | tail -1)
-            # Extract RC number (e.g., v1.2.3-rc4 -> 4)
-            RC_NUMBER=$(echo "$HIGHEST_RC" | sed 's/.*-rc//')
-            RC_NUMBER=$((RC_NUMBER + 1))
-          fi
-          
-          RC_TAG="v${TARGET_VERSION}-rc${RC_NUMBER}"
-          
-          echo "new_version=$TARGET_VERSION" >> $GITHUB_OUTPUT
-          echo "rc_tag=$RC_TAG" >> $GITHUB_OUTPUT
-          echo "rc_number=$RC_NUMBER" >> $GITHUB_OUTPUT
-          echo "highest_bump=$HIGHEST_BUMP" >> $GITHUB_OUTPUT
-          
-          echo "🏗️ Target version: $TARGET_VERSION (from baseline $LATEST_RELEASE, highest bump: $HIGHEST_BUMP)"
-          echo "🔢 RC tag: $RC_TAG (existing RCs for this version: $(echo "$EXISTING_RCS" | wc -l))"
-
-      - name: Create RC Tag
-        if: steps.conventional.outputs.should_release == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git tag -a "${{ steps.version.outputs.rc_tag }}" -m "Release Candidate ${{ steps.version.outputs.rc_tag }}"
-          git push origin "${{ steps.version.outputs.rc_tag }}"
-          
-          echo "🚀 Created RC tag: ${{ steps.version.outputs.rc_tag }}"
-
-  # Runs on hotfix branch pushes
-  create-hotfix-rc:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/hotfix/')
-    name: Create Hotfix RC
-    runs-on: ubuntu-latest
-    outputs:
-      hotfix_rc_tag: ${{ steps.hotfix_version.outputs.rc_tag }}
-      should_create_hotfix_rc: ${{ steps.hotfix_version.outputs.should_release }}
-      hotfix_version: ${{ steps.hotfix_version.outputs.new_version }}
-      base_version: ${{ steps.hotfix_version.outputs.base_version }}
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Calculate hotfix version
-        id: hotfix_version
-        run: |
-          # Extract branch name and validate hotfix pattern
-          BRANCH_NAME="${{ github.ref_name }}"
-          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          
-          # Validate hotfix branch format: hotfix/{issue}-{description}
-          if [[ ! "$BRANCH_NAME" =~ ^hotfix/[0-9]+-.*$ ]]; then
-            echo "❌ Invalid hotfix branch format: $BRANCH_NAME"
-            echo "Expected: hotfix/{issue-number}-{description}"
-            echo "Example: hotfix/123-fix-auth-bug"
-            exit 1
-          fi
-          
-          # Find the base version this hotfix branch was created from
-          # Look for the most recent tag that this branch contains
-          BASE_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-          
-          if [ -z "$BASE_TAG" ]; then
-            echo "❌ No base tag found. Hotfix branches must be created from existing release tags"
-            echo "Usage: git checkout v1.0.0 && git checkout -b hotfix/123-description"
-            exit 1
-          fi
-          
-          # Validate base tag is a release (not RC)
-          if [[ "$BASE_TAG" == *"-rc"* ]]; then
-            echo "❌ Hotfix base must be a release tag, not RC: $BASE_TAG"
-            echo "Checkout a production release tag (e.g. v1.0.0) before creating hotfix branch"
-            exit 1
-          fi
-          
-          echo "base_version=$BASE_TAG" >> $GITHUB_OUTPUT
-          
-          # Calculate next patch version
-          BASE_VERSION=${BASE_TAG#v}
-          IFS='.' read -r -a VERSION_PARTS <<< "$BASE_VERSION"
-          MAJOR=${VERSION_PARTS[0]}
-          MINOR=${VERSION_PARTS[1]:-0}  
-          PATCH=${VERSION_PARTS[2]:-0}
-          
-          # Increment patch version
-          PATCH=$((PATCH + 1))
-          HOTFIX_VERSION="$MAJOR.$MINOR.$PATCH"
-          
-          # Find next RC number for this hotfix version
-          EXISTING_HOTFIX_RCS=$(git tag -l "v${HOTFIX_VERSION}-rc*" | sort -V)
-          if [ -z "$EXISTING_HOTFIX_RCS" ]; then
-            RC_NUMBER=1
-          else
-            HIGHEST_RC=$(echo "$EXISTING_HOTFIX_RCS" | tail -1)
-            RC_NUMBER=$(echo "$HIGHEST_RC" | sed 's/.*-rc//')
-            RC_NUMBER=$((RC_NUMBER + 1))
-          fi
-          
-          HOTFIX_RC_TAG="v${HOTFIX_VERSION}-rc${RC_NUMBER}"
-          
-          echo "new_version=$HOTFIX_VERSION" >> $GITHUB_OUTPUT
-          echo "rc_tag=$HOTFIX_RC_TAG" >> $GITHUB_OUTPUT
-          echo "rc_number=$RC_NUMBER" >> $GITHUB_OUTPUT
-          echo "should_release=true" >> $GITHUB_OUTPUT
-          
-          echo "🩹 Hotfix version: $HOTFIX_VERSION (from base $BASE_TAG)"
-          echo "🔢 Hotfix RC tag: $HOTFIX_RC_TAG"
-
-      - name: Create Hotfix RC Tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git tag -a "${{ steps.hotfix_version.outputs.rc_tag }}" -m "Hotfix Release Candidate ${{ steps.hotfix_version.outputs.rc_tag }}"
-          git push origin "${{ steps.hotfix_version.outputs.rc_tag }}"
-          
-          echo "🚀 Created hotfix RC tag: ${{ steps.hotfix_version.outputs.rc_tag }}"
-
-  # Build RC (beta) version for main branch
-  build-rc:
-    if: needs.create-rc.outputs.should_create_rc == 'true'
-    name: Build RC (Beta)
-    needs: create-rc
-    runs-on: ubuntu-latest
+      release_tag: ${{ steps.version.outputs.release_tag }}
     strategy:
       matrix:
         include:
           - goos: linux
             goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: 386
           - goos: darwin
             goarch: amd64
-          - goos: darwin  
+          - goos: darwin
             goarch: arm64
           - goos: windows
             goarch: amd64
+          - goos: windows
+            goarch: 386
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -360,6 +57,29 @@ jobs:
             ~/.cache/go-build
             ~/go/pkg/mod
           key: ${{ runner.os }}-go-1.21-${{ hashFiles('**/go.sum') }}
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RC_TAG="${{ github.event.inputs.tag }}"
+          else
+            RC_TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          
+          # Validate RC tag format
+          if [[ ! "$RC_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+            echo "❌ Invalid RC tag format: $RC_TAG"
+            echo "Expected format: v1.2.3-rc1"
+            exit 1
+          fi
+          
+          # Convert RC tag to release tag (v1.2.0-rc1 -> v1.2.0)
+          RELEASE_TAG=${RC_TAG%-rc*}
+          
+          echo "rc_tag=$RC_TAG" >> $GITHUB_OUTPUT
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "✅ Valid RC tag: $RC_TAG → Release: $RELEASE_TAG"
 
       - name: Build RC Binary
         env:
@@ -373,10 +93,12 @@ jobs:
             EXT=".exe"
           fi
           
-          BINARY_NAME="gh-issue-dependency-${{ needs.create-rc.outputs.rc_tag }}-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
+          # Use proper GitHub CLI extension naming (without version number)
+          BINARY_NAME="gh-issue-dependency-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
           
+          echo "Building $BINARY_NAME for RC ${{ steps.version.outputs.rc_tag }}..."
           go build \
-            -ldflags "-s -w -X cmd.Version=${{ needs.create-rc.outputs.rc_tag }} -X cmd.Commit=${GITHUB_SHA:0:8} -X cmd.BuildType=beta" \
+            -ldflags "-s -w -X cmd.Version=${{ steps.version.outputs.rc_tag }} -X cmd.Commit=${GITHUB_SHA:0:8} -X cmd.BuildType=rc" \
             -o "dist/${BINARY_NAME}" \
             .
           
@@ -390,94 +112,80 @@ jobs:
           name: rc-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
 
-  # Build hotfix RC version  
-  build-hotfix-rc:
-    if: needs.create-hotfix-rc.outputs.should_create_hotfix_rc == 'true'
-    name: Build Hotfix RC
-    needs: create-hotfix-rc
+  create-prerelease:
+    name: Create GitHub Pre-release
+    needs: build-rc
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-          - goos: darwin
-            goarch: amd64
-          - goos: darwin  
-            goarch: arm64
-          - goos: windows
-            goarch: amd64
-
+    outputs:
+      rc_tag: ${{ needs.build-rc.outputs.rc_tag }}
+      release_tag: ${{ needs.build-rc.outputs.release_tag }}
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          fetch-depth: 0
 
-      - name: Cache Go modules
-        uses: actions/cache@v3
+      - name: Download all RC artifacts
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-1.21-${{ hashFiles('**/go.sum') }}
-
-      - name: Build Hotfix RC Binary
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
-        run: |
-          mkdir -p dist
-          EXT=""
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            EXT=".exe"
-          fi
-          
-          BINARY_NAME="gh-issue-dependency-${{ needs.create-hotfix-rc.outputs.hotfix_rc_tag }}-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
-          
-          go build \
-            -ldflags "-s -w -X cmd.Version=${{ needs.create-hotfix-rc.outputs.hotfix_rc_tag }} -X cmd.Commit=${GITHUB_SHA:0:8} -X cmd.BuildType=hotfix" \
-            -o "dist/${BINARY_NAME}" \
-            .
-          
-          # Create checksums
-          cd dist
-          sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
-
-      - name: Upload Hotfix RC artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: hotfix-rc-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
+          pattern: rc-binaries-*
+          merge-multiple: true
 
-  # Notify RC Creation
-  notify-rc-created:
-    name: Notify RC Created
-    needs: [create-rc, build-rc, create-hotfix-rc, build-hotfix-rc]
-    runs-on: ubuntu-latest
-    if: |
-      always() && (
-        needs.create-rc.outputs.should_create_rc == 'true' || 
-        needs.create-hotfix-rc.outputs.should_create_hotfix_rc == 'true'
-      )
-    
-    steps:
-      - name: RC Created Notification
+      - name: Generate changelog
+        id: changelog
         run: |
-          if [ "${{ needs.create-hotfix-rc.outputs.should_create_hotfix_rc }}" = "true" ]; then
-            echo "🩹 Hotfix RC ${{ needs.create-hotfix-rc.outputs.hotfix_rc_tag }} created successfully"
-            echo "📦 Base version: ${{ needs.create-hotfix-rc.outputs.base_version }}"
-            echo "🚀 Beta workflow will automatically deploy this RC for testing"
+          RC_TAG="${{ needs.build-rc.outputs.rc_tag }}"
+          
+          # Generate changelog from commits since last release
+          LATEST_RELEASE=$(git tag -l "v*" | grep -v "rc" | sort -V | tail -1)
+          if [ -z "$LATEST_RELEASE" ]; then
+            echo "## Changes" > release_notes.md
+            echo "- Initial release candidate" >> release_notes.md
           else
-            echo "🏷️ RC ${{ needs.create-rc.outputs.rc_tag }} created successfully"
-            echo "🚀 Beta workflow will automatically deploy this RC for testing"
+            echo "## Changes since $LATEST_RELEASE" > release_notes.md
+            git log --pretty=format:"- %s (%h)" ${LATEST_RELEASE}..HEAD >> release_notes.md
           fi
+          
+          # Add RC-specific info
+          echo "" >> release_notes.md
+          echo "## 🧪 Release Candidate Information" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "This is a **release candidate** for testing purposes." >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### GitHub CLI Extension Installation" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "# Install this RC for testing" >> release_notes.md
+          echo "gh extension install torynet/gh-issue-dependency --pin $RC_TAG" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Testing Guidelines" >> release_notes.md
+          echo "- ⚠️ **Not recommended for production use**" >> release_notes.md
+          echo "- Please test thoroughly and report any issues" >> release_notes.md
+          echo "- If testing is successful, this RC will be promoted to production release \`${{ needs.build-rc.outputs.release_tag }}\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "**Commit**: ${{ github.sha }}" >> release_notes.md
+          echo "**Build**: ${{ github.run_id }}" >> release_notes.md
+
+      - name: Create Pre-release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.build-rc.outputs.rc_tag }}
+          name: Release Candidate ${{ needs.build-rc.outputs.rc_tag }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: true
+          files: |
+            dist/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify RC Created
+        run: |
+          echo "🚀 RC ${{ needs.build-rc.outputs.rc_tag }} created successfully!"
+          echo "📦 Pre-release available at: https://github.com/${{ github.repository }}/releases/tag/${{ needs.build-rc.outputs.rc_tag }}"
           echo ""
-          echo "Next steps:"
-          echo "1. RC will be deployed to beta environment automatically"
-          echo "2. Test the beta release thoroughly"
-          echo "3. If ready, approve the beta deployment to promote to production"
+          echo "🔧 GitHub CLI Extension Installation:"
+          echo "gh extension install torynet/gh-issue-dependency --pin ${{ needs.build-rc.outputs.rc_tag }}"
+          echo ""
+          echo "✅ Ready for testing - if successful, promote to release ${{ needs.build-rc.outputs.release_tag }}"
