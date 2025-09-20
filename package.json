@@ -1,0 +1,16 @@
+{
+  "name": "gh-issue-dependency",
+  "version": "0.0.0-development",
+  "description": "GitHub CLI extension for managing issue dependencies",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/torynet/gh-issue-dependency.git"
+  },
+  "devDependencies": {
+    "@semantic-release/commit-analyzer": "^11.1.0",
+    "@semantic-release/release-notes-generator": "^12.1.0",
+    "@semantic-release/github": "^9.2.6",
+    "semantic-release": "^22.0.12"
+  }
+}

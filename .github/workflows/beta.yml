@@ -22,11 +22,11 @@ jobs:
     name: Test and Validate
     runs-on: ubuntu-latest
     outputs:
-      should_create_rc: ${{ steps.conventional.outputs.should_release }}
-      rc_tag: ${{ steps.version.outputs.rc_tag }}
-      new_version: ${{ steps.version.outputs.new_version }}
-      conventional_type: ${{ steps.conventional.outputs.conventional_type }}
-      bump_type: ${{ steps.conventional.outputs.bump_type }}
+      should_create_rc: ${{ steps.semantic-release.outputs.should_release }}
+      rc_tag: ${{ steps.rc-tag.outputs.rc_tag }}
+      new_version: ${{ steps.semantic-release.outputs.new_version }}
+      release_type: ${{ steps.semantic-release.outputs.release_type }}
+      rc_number: ${{ steps.rc-tag.outputs.rc_number }}
     
     steps:
       - name: Checkout
@@ -71,129 +71,74 @@ jobs:
             echo "ℹ️ No integration tests found"
           fi
 
-      - name: Analyze conventional commit
-        id: conventional
+      - name: Setup Node.js for semantic-release
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install semantic-release dependencies
+        run: npm ci
+
+      - name: Analyze conventional commit with semantic-release
+        id: semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get commit subject (first line only) for conventional commit analysis
-          COMMIT_SUBJECT="$(git log -1 --pretty=%s)"
-          COMMIT_BODY="$(git log -1 --pretty=%B)"
+          # Run semantic-release in dry-run mode to analyze commits
+          npx semantic-release --dry-run --no-ci > semantic-release-output.txt 2>&1 || true
           
-          echo "commit_subject=$COMMIT_SUBJECT" >> $GITHUB_OUTPUT
-          
-          # Use heredoc for multiline commit message
-          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMIT_BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          # Check if this is a conventional commit that should trigger release
-          SHOULD_RELEASE="false"
-          BUMP_TYPE=""
-          CONVENTIONAL_TYPE=""
-          
-          # Extract conventional commit type from new format: {issue}: {type}: {description}
-          if [[ "$COMMIT_SUBJECT" =~ ^[0-9]+:\ (feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?:\ .+ ]]; then
-            # Extract the type (with potential ! for breaking change)
-            CONVENTIONAL_TYPE=$(echo "$COMMIT_SUBJECT" | sed -E -n 's/^[0-9]+: ([a-z]+)(!)?: .*/\1\2/p')
-            echo "🔍 Extracted conventional type from new format: $CONVENTIONAL_TYPE"
-            
-          # Check for standard conventional commit format: {type}: {description}
-          elif [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?:\ .+ ]] || [[ "$COMMIT_SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(!)?(\(.+\))?:\ .+ ]]; then
-            # Extract the type (with potential ! for breaking change)
-            CONVENTIONAL_TYPE=$(echo "$COMMIT_SUBJECT" | sed -E -n 's/^([a-z]+)(!)?(\(.+\))?: .*/\1\2/p')
-            echo "🔍 Extracted conventional type from standard format: $CONVENTIONAL_TYPE"
-            
-          # Legacy format without conventional commit type - no release
-          else
-            echo "ℹ️ Commit does not follow conventional commit format for releases: $COMMIT_SUBJECT"
-            echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # Determine release type based on conventional commit type
-          case "$CONVENTIONAL_TYPE" in
-            *!)
-              # Breaking change (any type with !)
-              SHOULD_RELEASE="true"
-              BUMP_TYPE="major"
-              ;;
-            feat)
-              # New feature
-              SHOULD_RELEASE="true"
-              BUMP_TYPE="minor"
-              ;;
-            fix|perf)
-              # Bug fix or performance improvement
-              SHOULD_RELEASE="true"
-              BUMP_TYPE="patch"
-              ;;
-            docs|style|refactor|test|chore|ci|build|revert)
-              # Non-release types
-              SHOULD_RELEASE="false"
-              echo "ℹ️ Commit type '$CONVENTIONAL_TYPE' does not trigger releases"
-              ;;
-            *)
-              # Unknown type
-              SHOULD_RELEASE="false"
-              echo "⚠️ Unknown conventional commit type: $CONVENTIONAL_TYPE"
-              ;;
-          esac
-          
-          # Check for breaking changes in commit body
-          if [[ "$COMMIT_BODY" == *"BREAKING CHANGE"* ]]; then
+          # Extract information from semantic-release output
+          if grep -q "The next release version is" semantic-release-output.txt; then
+            # semantic-release determined a new version should be created
+            NEW_VERSION=$(grep "The next release version is" semantic-release-output.txt | sed -E 's/.*The next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+            RELEASE_TYPE=$(grep "Analysis of .* commits complete: " semantic-release-output.txt | sed -E 's/.*Analysis of .* commits complete: ([a-z]+) release/\1/' || echo "patch")
             SHOULD_RELEASE="true"
-            BUMP_TYPE="major"
-            echo "🚨 Breaking change detected in commit body"
+            
+            echo "✅ semantic-release analysis: $NEW_VERSION ($RELEASE_TYPE release)"
+          else
+            # No release needed
+            SHOULD_RELEASE="false"
+            NEW_VERSION=""
+            RELEASE_TYPE=""
+            
+            echo "ℹ️ semantic-release analysis: No release needed"
           fi
           
           # Override if force_rc is set
           if [ "${{ github.event.inputs.force_rc }}" = "true" ]; then
             SHOULD_RELEASE="true"
-            if [ -z "$BUMP_TYPE" ]; then
-              BUMP_TYPE="patch"
+            if [ -z "$NEW_VERSION" ]; then
+              # Get latest release for forced RC
+              LATEST_RELEASE=$(git tag -l "v*" | grep -v "rc" | sort -V | tail -1 || echo "v0.0.0")
+              BASE_VERSION=${LATEST_RELEASE#v}
+              IFS='.' read -r -a VERSION_PARTS <<< "$BASE_VERSION"
+              MAJOR=${VERSION_PARTS[0]}
+              MINOR=${VERSION_PARTS[1]:-0}
+              PATCH=$((${VERSION_PARTS[2]:-0} + 1))
+              NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+              RELEASE_TYPE="patch"
             fi
-            echo "🚀 Force RC creation enabled"
+            echo "🚀 Force RC creation enabled: $NEW_VERSION"
           fi
           
           echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
-          echo "conventional_type=$CONVENTIONAL_TYPE" >> $GITHUB_OUTPUT
-          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
           
-          if [ "$SHOULD_RELEASE" = "true" ]; then
-            echo "✅ Tests passed and conventional commit detected: $COMMIT_SUBJECT (type: $CONVENTIONAL_TYPE, bump: $BUMP_TYPE)"
-          else
-            echo "ℹ️ Tests passed but commit does not trigger release: $COMMIT_SUBJECT (type: $CONVENTIONAL_TYPE)"
-          fi
+          # Show semantic-release output for debugging
+          echo "📋 semantic-release output:"
+          cat semantic-release-output.txt
+          rm semantic-release-output.txt
 
-      - name: Calculate next version
-        if: steps.conventional.outputs.should_release == 'true'
-        id: version
+      - name: Calculate RC tag
+        if: steps.semantic-release.outputs.should_release == 'true'
+        id: rc-tag
         run: |
-          # Get latest release tag (not RC tags) - this is our baseline
-          LATEST_RELEASE=$(git tag -l "v*" | grep -v "rc" | sort -V | tail -1)
-          if [ -z "$LATEST_RELEASE" ]; then
-            LATEST_RELEASE="v0.0.0"
-          fi
-          echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
-          
-          # Parse baseline version numbers
-          BASE_VERSION=${LATEST_RELEASE#v}
-          IFS='.' read -r -a VERSION_PARTS <<< "$BASE_VERSION"
-          MAJOR=${VERSION_PARTS[0]}
-          MINOR=${VERSION_PARTS[1]:-0}
-          PATCH=${VERSION_PARTS[2]:-0}
-          
-          # Calculate target version based on bump type
-          BUMP_TYPE="${{ steps.conventional.outputs.bump_type }}"
-          case "$BUMP_TYPE" in
-            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
-            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
-            patch) PATCH=$((PATCH + 1)) ;;
-          esac
-          
-          TARGET_VERSION="$MAJOR.$MINOR.$PATCH"
+          NEW_VERSION="${{ steps.semantic-release.outputs.new_version }}"
           
           # Find next RC number for this target version
-          EXISTING_RCS=$(git tag -l "v${TARGET_VERSION}-rc*" | sort -V)
+          EXISTING_RCS=$(git tag -l "v${NEW_VERSION}-rc*" | sort -V)
           if [ -z "$EXISTING_RCS" ]; then
             RC_NUMBER=1
           else
@@ -204,13 +149,12 @@ jobs:
             RC_NUMBER=$((RC_NUMBER + 1))
           fi
           
-          RC_TAG="v${TARGET_VERSION}-rc${RC_NUMBER}"
+          RC_TAG="v${NEW_VERSION}-rc${RC_NUMBER}"
           
-          echo "new_version=$TARGET_VERSION" >> $GITHUB_OUTPUT
           echo "rc_tag=$RC_TAG" >> $GITHUB_OUTPUT
           echo "rc_number=$RC_NUMBER" >> $GITHUB_OUTPUT
           
-          echo "🏗️ Target version: $TARGET_VERSION (from baseline $LATEST_RELEASE, bump: $BUMP_TYPE)"
+          echo "🏗️ Target version: $NEW_VERSION (semantic-release: ${{ steps.semantic-release.outputs.release_type }})"
           echo "🔢 RC tag: $RC_TAG"
 
   create-rc-tag:
@@ -263,6 +207,6 @@ jobs:
             fi
           else
             echo "✅ All tests passed but commit does not trigger release"
-            echo "ℹ️ Type: ${{ needs.test-and-validate.outputs.conventional_type }}"
+            echo "ℹ️ semantic-release: No version bump needed"
           fi
 
