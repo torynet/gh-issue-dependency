@@ -24,6 +24,11 @@ Common issues and solutions when using gh-issue-dependency.
 
 3. **Reinstall**:
    ```bash
+   # For extension installation
+   gh extension uninstall torynet/gh-issue-dependency
+   gh extension install torynet/gh-issue-dependency
+   
+   # For Go installation (development)
    go clean -modcache
    go install github.com/torynet/gh-issue-dependency@latest
    ```
@@ -378,7 +383,7 @@ Check these locations for additional error information:
 ### Before Reporting Issues
 
 1. **Search existing issues**: Your problem might already be reported
-2. **Check the latest version**: `go install github.com/torynet/gh-issue-dependency@latest`
+2. **Check the latest version**: `gh extension upgrade torynet/gh-issue-dependency` or `go install github.com/torynet/gh-issue-dependency@latest`
 3. **Gather debug information**: Include version info and error messages
 4. **Create minimal reproduction**: Provide steps to reproduce the issue
 

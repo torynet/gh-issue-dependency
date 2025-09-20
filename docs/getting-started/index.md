@@ -14,30 +14,27 @@ Before installing gh-issue-dependency, make sure you have:
 
 ## Installation
 
-### Option 1: Go Install (Recommended)
+### Option 1: GitHub CLI Extension (Recommended)
+
+```bash
+gh extension install torynet/gh-issue-dependency
+```
+
+### Option 2: Go Install (Development/Testing)
 
 ```bash
 go install github.com/torynet/gh-issue-dependency@latest
 ```
 
-### Option 2: Download Binary
+### Option 3: Download Binary
 
 1. Visit the [Releases page](https://github.com/torynet/gh-issue-dependency/releases)
 2. Download the appropriate binary for your system
 3. Extract and place in your PATH
 
-### Option 3: Package Managers
-
-```bash
-# Homebrew (macOS/Linux)
-brew install torynet/tap/gh-issue-dependency
-
-# Chocolatey (Windows)  
-choco install gh-issue-dependency
-
-# Scoop (Windows)
-scoop install gh-issue-dependency
-```
+!!! note "Package Managers"
+    Package manager support (Homebrew, Chocolatey, etc.) is planned for future releases. 
+    For now, we recommend using the GitHub CLI extension method for the best experience.
 
 ## Verify Installation
 
