@@ -53,6 +53,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Setup Pages
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         id: pages
         uses: actions/configure-pages@v4
 
@@ -60,10 +61,11 @@ jobs:
         run: |
           mkdocs build --clean --strict
         env:
-          SITE_URL: ${{ steps.pages.outputs.base_url }}
+          SITE_URL: ${{ steps.pages.outputs.base_url || 'https://torynet.github.io/gh-issue-dependency' }}
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./site
 
@@ -77,4 +79,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v3
+        uses: actions/deploy-pages@v4

@@ -7,6 +7,8 @@ repo_name: torynet/gh-issue-dependency
 repo_url: https://github.com/torynet/gh-issue-dependency
 edit_uri: edit/main/docs/
 
+docs_dir: docs
+
 theme:
   name: material
   palette:
