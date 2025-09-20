@@ -27,12 +27,16 @@ jobs:
             goarch: amd64
           - goos: linux
             goarch: arm64
+          - goos: linux
+            goarch: 386
           - goos: darwin
             goarch: amd64
           - goos: darwin
             goarch: arm64
           - goos: windows
             goarch: amd64
+          - goos: windows
+            goarch: 386
 
     steps:
       - name: Checkout
@@ -79,7 +83,7 @@ jobs:
             EXT=".exe"
           fi
           
-          BINARY_NAME="gh-issue-dependency-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
+          BINARY_NAME="gh-issue-dependency-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
           
           go build \
             -ldflags "-s -w -X cmd.Version=${{ steps.version.outputs.version }} -X cmd.Commit=${GITHUB_SHA:0:8} -X cmd.BuildType=release" \
